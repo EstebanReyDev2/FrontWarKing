@@ -23,7 +23,6 @@ const modules: Record<string, () => Promise<unknown>> = {
   "join-lobby-modal": () => import("./JoinLobbyModal"),
   "leaderboard-modal": () => import("./LeaderboardModal"),
   "matchmaking-modal": () => import("./Matchmaking"),
-  "news-modal": () => import("./NewsModal"),
   "player-profile-modal": () => import("./PlayerProfileModal"),
   "ranked-modal": () => import("./components/RankedModal"),
   "rewards-modal": () => import("./RewardsModal"),

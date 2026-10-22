@@ -1465,7 +1465,6 @@
     "login_google": "Login with Google",
     "login_steam": "Login with Steam",
     "menu": "Menu",
-    "news": "News",
     "play": "Play",
     "privacy_policy": "Privacy Policy",
     "quit": "Exit game",
@@ -1738,18 +1737,6 @@
     "failed": "Could not create a new lobby. Please try again.",
     "join": "Join",
     "message": "Host started a new lobby"
-  },
-  "news": {
-    "title": "Release Notes"
-  },
-  "news_box": {
-    "dismiss": "Dismiss",
-    "firefox_warning": "OpenFront.io doesn't perform well with [Firefox-based browsers](https://simple.wikipedia.org/wiki/Web_browsers_based_on_Firefox). We recommend you to use a [Chromium-based browser](https://en.wikipedia.org/wiki/Chromium_(web_browser)#Browsers_based_on_Chromium) for best performance.",
-    "go_to_item": "Go to item {num}",
-    "news": "NEWS",
-    "tournament": "TOURNAMENT",
-    "tutorial": "TUTORIAL",
-    "warning": "WARNING"
   },
   "overtime": {
     "first_place": "1st: {name} ({pct}%)",

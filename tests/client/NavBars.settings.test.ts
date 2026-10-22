@@ -79,7 +79,7 @@ describe("nav-utility-icons settings cogwheel", () => {
     const buttons = Array.from(
       icons.querySelectorAll<HTMLElement>(".nav-menu-item[data-page]"),
     ).map((b) => b.dataset.page);
-    expect(buttons).toEqual(["page-news", "page-help", "page-settings"]);
+    expect(buttons).toEqual(["page-help", "page-settings"]);
   });
 
   it("marks the button active once the settings page is shown", async () => {

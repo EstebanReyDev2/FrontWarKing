@@ -1,0 +1,93 @@
+﻿# Failing tests on main, measured before Phase 1.
+# Two consecutive runs of the full suite on `main` (Windows, this machine).
+# Only names failing in BOTH runs are listed here.
+# Tests that failed in just one run are in baseline-flaky.txt.
+# Format: <test file> > <full test name>
+
+tests/client/InventoryModal.test.ts > InventoryModal explains guest access across inventory categories and opens sign-in
+tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (a) shows the total, the level change and each source at its base value
+tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (b) without a level-up, shows the level and the progress through it
+tests/client/ProfileCard.test.ts > <profile-card> shows the name, clan, prestige and level, the XP bar and lifetime XP
+tests/client/ProgressionModals.test.ts > player profile level shows another player's level from the public endpoint
+tests/client/RewardTrack.test.ts > <reward-track> end card tags the next rank's exclusive inside the card
+tests/DeployIdentity.test.ts > deploy.sh identity keeps a standalone prod deployment's page on its own name
+tests/DeployIdentity.test.ts > deploy.sh identity keeps the bare container name for any other explicit game host
+tests/DeployIdentity.test.ts > deploy.sh identity passes an explicit letter and worker count through
+tests/DeployIdentity.test.ts > deploy.sh identity qualifies the container name for a machine-scoped game host
+tests/DeployIdentity.test.ts > deploy.sh identity refuses a game host that is not a hostname
+tests/DeployIdentity.test.ts > deploy.sh identity refuses letter "1"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses letter "ab"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses letter "C"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses worker count "0"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses worker count "-1"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses worker count "2.5"
+tests/DeployIdentity.test.ts > deploy.sh identity refuses worker count "two"
+tests/DeployIdentity.test.ts > deploy.sh identity resolves a standalone dev deployment's hosts
+tests/DeployIdentity.test.ts > deploy.sh identity resolves prod's hosts and leaves the identity to the registry
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of an explicit SITE_HOST on a colour
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of blue on dev
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of blue on prod
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of blue2 (not a slot)
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of blue2 on prod (not a slot)
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of bluegreen (not a slot)
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of green on dev
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of green on prod
+tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of main on dev
+tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh defaults to a single worker when NUM_WORKERS is unset
+tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh generates the upstream + worker port map from NUM_WORKERS
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest accepts a 404 immediately ÔÇö the API predates the registry
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (400)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (401)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (403)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest fails the deploy when 409 outlasts the retries
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest posts the site and the full version to /cluster/latest
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries a 409 until a server has registered for this version
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries a broken API (500)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries a broken API (502)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries a broken API (503)
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries when curl itself fails (000) instead of deciding on one attempt
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest retries when curl itself fails (nostatus) instead of deciding on one attempt
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest stops retrying an unreachable API once the deadline passes
+tests/UpdatePullImage.test.ts > update.sh pull image drops the token from the env file the containers get
+tests/UpdatePullImage.test.ts > update.sh pull image drops the token from the env file when the pull fails
+tests/UpdatePullImage.test.ts > update.sh pull image fails the deploy when the login fails
+tests/UpdatePullImage.test.ts > update.sh pull image logs in with the token on stdin, pulls, then logs out
+tests/UpdatePullImage.test.ts > update.sh pull image logs out and fails the deploy when the pull fails
+tests/UpdatePullImage.test.ts > update.sh pull image never puts the token on the command line
+tests/UpdatePullImage.test.ts > update.sh pull image pulls anonymously without a token
+tests/UpdateRegister.test.ts > update.sh register_identity asks the registry who this host is and takes its answer
+tests/UpdateRegister.test.ts > update.sh register_identity fails at once on a 400, which a retry cannot fix
+tests/UpdateRegister.test.ts > update.sh register_identity fails at once on a 401, which a retry cannot fix
+tests/UpdateRegister.test.ts > update.sh register_identity fails at once on a 404, which a retry cannot fix
+tests/UpdateRegister.test.ts > update.sh register_identity fails at once on a 409, which a retry cannot fix
+tests/UpdateRegister.test.ts > update.sh register_identity fails the deploy when the API never answers
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a body that is not JSON
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a fractional worker count
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a letter that is not one
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a letter that would be shell
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a missing letter
+tests/UpdateRegister.test.ts > update.sh register_identity refuses a 200 carrying a zero worker count
+tests/UpdateRegister.test.ts > update.sh register_identity retries an API it cannot reach, then succeeds
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not restart a deployment whose subdomain somehow arrived empty
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not treat main-feature as a long-lived subdomain
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not treat nightly-test as a long-lived subdomain
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not treat overnightly as a long-lived subdomain
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not treat premain as a long-lived subdomain
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy does not treat remain as a long-lived subdomain
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy leaves the per-branch preview experiment.openfront.dev down after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy leaves the per-branch preview fix-some-bug.openfront.dev down after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy leaves the per-branch preview t3code-mirv-cooldown-timer.openfront.dev down after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts production (blue.openfront.io) whatever its subdomain is
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts production (green.openfront.io) whatever its subdomain is
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts production (main.openfront.io) whatever its subdomain is
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts production (nightly.openfront.io) whatever its subdomain is
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts the long-lived blue.openfront.dev deployment after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts the long-lived green.openfront.dev deployment after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts the long-lived main.openfront.dev deployment after a crash
+tests/UpdateRestartPolicy.test.ts > update.sh restart policy restarts the long-lived nightly.openfront.dev deployment after a crash
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule accepts the standalone game host deploy.sh resolved
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule backticks every host name
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule emits a single Host() when GAME_DOMAIN is absent
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule matches only the game host when it is machine-scoped
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule matches the page host and the game host when GAME_DOMAIN is set
+tests/UpdateTraefikHostRule.test.ts > update.sh traefik host rule treats an empty GAME_DOMAIN exactly like an absent one

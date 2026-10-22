@@ -281,7 +281,6 @@ export class LangSelector extends LitElement {
       "level-badge",
       "game-xp-panel",
       "past-game-xp-card",
-      "news-modal",
       "account-modal",
       "game-stats-modal",
       "player-profile-modal",

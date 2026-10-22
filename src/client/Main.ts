@@ -18,8 +18,6 @@ import {
 import { ClientEnv } from "src/client/ClientEnv";
 import { renderNavVersion } from "src/client/GameVersion";
 import { responseHasLinkedIdentity } from "./AccountIdentity";
-import { adGatekeeper } from "./AdGatekeeper";
-import { loadAdmiral, onAdmiralMeasured } from "./Admiral";
 import { getUserMe, invalidateUserMe, markNoticeSeen } from "./Api";
 import {
   getDesktopSessionState,
@@ -70,8 +68,6 @@ import {
 import { gamePortal } from "./GamePortal";
 import { GameStartingModal } from "./GameStartingModal";
 import type { HelpModal } from "./HelpModal";
-import "./HomepagePromos";
-import type { HomepagePromos } from "./HomepagePromos";
 import type { HostLobbyModal as HostPrivateLobbyModal } from "./HostLobbyModal";
 import { showInGameAlert, showInGameConfirm } from "./InGameModal";
 import type { JoinLobbyModal } from "./JoinLobbyModal";
@@ -85,11 +81,6 @@ import {
   SendUpdateGameConfigIntentEvent,
 } from "./LobbyEvents";
 import type { MatchmakingModal, MatchmakingMode } from "./Matchmaking";
-import {
-  hideMenuChrome,
-  menuChromeIsTornDown,
-  restoreMenuChrome,
-} from "./MenuChrome";
 import { modalRouter } from "./ModalRouter";
 import { updateAccountNavButton } from "./NavAccountButton";
 import { initNavigation } from "./Navigation";
@@ -356,11 +347,9 @@ class Client {
    * leaves the lobby in place before the chunk lands is back on a live home
    * page, and a flag that only ever latched on would keep the theme off it.
    *
-   * Its own flag rather than menuChromeIsTornDown(), which the replay viewer
-   * also sets without a "game-starting" to go with it. Set and cleared beside
-   * those two dispatches, so it says exactly what a listener needs to know:
-   * whether it would already have been disarmed had it been there to hear
-   * them.
+   * Set and cleared beside the "game-starting" and "menu-restored"
+   * dispatches, so it says exactly what a listener needs to know: whether it
+   * would already have been disarmed had it been there to hear them.
    */
   private menuTornDown = false;
   // Held apart from presenceDetail because that object is REPLACED wholesale
@@ -496,7 +485,6 @@ class Client {
     // The canonical profile link, `/player/<id>` (see playerProfileUrl).
     modalRouter.registerPath("profile", playerProfileRouteArgs);
     modalRouter.register("help", { tag: "help-modal", pageId: "page-help" });
-    modalRouter.register("news", { tag: "news-modal", pageId: "page-news" });
     modalRouter.register("language", {
       tag: "language-modal",
       pageId: "page-language",
@@ -757,26 +745,6 @@ class Client {
       } else {
         updateAccountNavButton(userMeResponse);
       }
-      const isAdFree =
-        userMeResponse !== false && userMeResponse.player?.adfree === true;
-      window.adsEnabled =
-        !isAdFree && !gamePortal.isOnGamePortal() && !isDesktopShell();
-      // Ad-eligible users only: paid/adfree users must never load Admiral (its
-      // adblock popup fires autonomously once the payload runs). Start watching
-      // adblock state; once a blocker is ever detected the in-game ad is
-      // suppressed forever (persisted) — those users are highly ad-sensitive.
-      if (window.adsEnabled) {
-        loadAdmiral();
-        // Admiral's read is more reliable than our DOM bait, so use it as a
-        // fast initial signal. A blocker that whitelists this site still shows
-        // ads, so "blocked" means adblocking AND not whitelisted.
-        onAdmiralMeasured((res) => {
-          adGatekeeper.seed(
-            res.adblocking === true && res.whitelisted !== true,
-          );
-        });
-        adGatekeeper.start();
-      }
       // Before the dispatch: <username-input> reads this store when it picks
       // the lapse notice's wording, and the record has to be current by then.
       const grantStoreBefore = parseSteamGrantStore(
@@ -977,9 +945,9 @@ class Client {
 
     // A session dropped in the background — an expired refresh token, a 401 on
     // any endpoint — clears itself deep inside Auth, where none of the above
-    // is reachable. Routing it through onUserMe means the nav button, its
-    // cached profile and window.adsEnabled all follow, rather than only the
-    // components listening for userMeResponse.
+    // is reachable. Routing it through onUserMe means the nav button and its
+    // cached profile all follow, rather than only the components listening for
+    // userMeResponse.
     document.addEventListener("session-cleared", () => {
       authGeneration++;
       snapshotLapseMarker();
@@ -1242,7 +1210,6 @@ class Client {
       "inventory-modal",
       "store-modal",
       "language-modal",
-      "news-modal",
       "account-button",
       "leaderboard-button",
       "token-login",
@@ -1254,7 +1221,6 @@ class Client {
       "change-username-modal",
       "subscription-modal",
       "lang-selector",
-      "homepage-promos",
     ].forEach((tag) => {
       const modal = document.querySelector(tag) as HTMLElement & {
         close?: () => void;
@@ -1267,7 +1233,6 @@ class Client {
       }
     });
     this.gameModeSelector.stop();
-    hideMenuChrome();
   }
 
   /** A game or lobby is up, or a join is on its way to one. */
@@ -1316,11 +1281,6 @@ class Client {
     this.loadedHostModal()?.closeWithoutLeaving();
     this.loadedJoinModal()?.closeWithoutLeaving();
     this.closeMenu();
-    // close() keeps a lobby's bottom rail for the spawn phase, which the
-    // viewer never reaches.
-    (
-      document.querySelector("homepage-promos") as HomepagePromos | null
-    )?.destroyBottomRail?.();
     // Closing a modal the router opened clears the hash. Put the viewer's
     // back, so a reload opens the replay again.
     if (window.location.hash !== hash) {
@@ -1912,8 +1872,6 @@ class Client {
       this.gameModeSelector.stop();
       incrementGamesPlayed();
 
-      hideMenuChrome();
-
       if (window.PageOS?.session?.newPageView) {
         window.PageOS.session.newPageView();
       }
@@ -2110,14 +2068,13 @@ class Client {
     // than in openInvite() because handleLeaveLobby is reached from several
     // places and any of them could be the next to hit it after a teardown.
     //
-    // The gate asks whether the chrome is torn down, NOT whether we were
+    // The gate asks whether the menu is torn down, NOT whether we were
     // in-game: the teardown happens at prestart while the in-game signal is
     // only set at join, so gating on the signal missed a leave landing in the
     // window between them. Because the gate no longer reads that signal, it
     // does not matter that setInGameSignal(false) has already run above.
-    if (menuChromeIsTornDown()) {
+    if (this.menuTornDown) {
       this.gameModeSelector?.start();
-      restoreMenuChrome();
       // The counterpart to "game-starting", and the only signal that the home
       // page is live again without a navigation. MenuMusic tore its gesture
       // listeners down at prestart and needs them back, or the menu theme is
@@ -2173,7 +2130,7 @@ class Client {
     whenModalLoaded("matchmaking-modal", () => {
       // A game that started while it loaded has the screen now, and the
       // game-start teardown couldn't close a modal that hadn't loaded.
-      if (menuChromeIsTornDown()) return;
+      if (this.menuTornDown) return;
       // Always set the mode: dispatchers without a detail (homepage button,
       // requeue URL) mean 1v1 and must reset a lingering selection.
       this.matchmakingModal.mode = event.detail?.mode ?? "1v1";

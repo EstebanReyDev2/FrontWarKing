@@ -1,0 +1,7 @@
+﻿# Tests that fail intermittently on main (one of two runs only).
+# Same measurement as baseline-failures.txt.
+
+tests/client/InventoryModal.test.ts > InventoryModal announces flag, crown and skin selections too
+tests/client/InventoryModal.test.ts > InventoryModal navigates all four loadout categories
+tests/client/InventoryModal.test.ts > InventoryModal reacts to all settings keys changed outside Inventory
+tests/client/InventoryModal.test.ts > InventoryModal resynchronizes equipped Effects cards when the grid remounts

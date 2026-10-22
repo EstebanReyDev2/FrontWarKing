@@ -79,23 +79,6 @@ vi.mock("../../src/client/BootInterrupts", () => ({
 }));
 
 // Injects a third-party script and polls; nothing under test needs it.
-vi.mock("../../src/client/Admiral", () => ({
-  loadAdmiral: vi.fn(),
-  onAdmiralMeasured: vi.fn(),
-}));
-
-// adGatekeeper.start() would install a poll interval and DOM bait.
-// HomepagePromos (also in Main's graph) reads canShowAds and nothing else.
-vi.mock("../../src/client/AdGatekeeper", () => ({
-  adGatekeeper: {
-    seed: vi.fn(),
-    start: vi.fn(),
-    stop: vi.fn(),
-    canShowAds: false,
-    whenClear: () => () => {},
-  },
-}));
-
 // Cuts the whole Pixi/WebGL/worker/audio in-game graph out of the import.
 // Transport/LocalServer only take the LobbyConfig *type* from this module,
 // so a value-only stub is safe.
@@ -255,9 +238,6 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
   it("runs the signed-out boot: onUserMe(false) and the missing-version warn", () => {
     // renderNavVersion() === 0 branch (line 411).
     expect(warnSpy).toHaveBeenCalledWith("Game version element not found");
-    // userAuth() === false → onUserMe(false) (line 735), which flips the ad
-    // entitlement on for a signed-out web player.
-    expect(window.adsEnabled).toBe(true);
   });
 
   it("clears the stale achievements.pushed record", () => {
@@ -727,12 +707,12 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
     const gameStarting = vi.fn();
     document.addEventListener("game-starting", gameStarting);
     // Loaded on demand: the router loads a modal before opening it.
-    await loadModal("news-modal");
-    const news = document.querySelector("news-modal") as unknown as {
+    await loadModal("help-modal");
+    const help = document.querySelector("help-modal") as unknown as {
       close: () => void;
     };
-    const newsClose = vi
-      .spyOn(news, "close")
+    const helpClose = vi
+      .spyOn(help, "close")
       .mockImplementation(() =>
         history.replaceState(null, "", window.location.pathname),
       );
@@ -745,7 +725,7 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
       ).toBe("dqKzit4cWu"),
     );
     expect(gameStarting).toHaveBeenCalledOnce();
-    expect(newsClose).toHaveBeenCalled();
+    expect(helpClose).toHaveBeenCalled();
     // A lobby modal is closed like at a game start: disarmed, so closing it
     // doesn't leave a lobby it never joined.
     expect(disarmSpy).toHaveBeenCalled();
@@ -753,7 +733,7 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
     // Kept, so a reload opens the replay again.
     expect(window.location.hash).toBe("#replay-viewer=dqKzit4cWu");
     document.removeEventListener("game-starting", gameStarting);
-    newsClose.mockRestore();
+    helpClose.mockRestore();
     closeSpy.mockRestore();
     disarmSpy.mockRestore();
     closeWithoutLeavingSpy.mockRestore();

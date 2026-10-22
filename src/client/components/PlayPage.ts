@@ -4,7 +4,6 @@ import { customElement } from "lit/decorators.js";
 import "./CosmeticBackground";
 import "./NavAccountMenu";
 import "./NavUtilityIcons";
-import "./NewsBox";
 import "./SteamWishlist";
 import "./StreamingNow";
 
@@ -25,7 +24,7 @@ export class PlayPage extends LitElement {
 
         <!-- Mobile: Fixed top bar -->
         <div
-          class="lg:hidden fixed left-0 right-0 top-[var(--top-ad-height,0px)] z-40 pt-[env(safe-area-inset-top)] bg-surface border-b border-white/10"
+          class="lg:hidden fixed left-0 right-0 top-0 z-40 pt-[env(safe-area-inset-top)] bg-surface border-b border-white/10"
         >
           <div
             class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center h-14 px-2 gap-2"
@@ -88,10 +87,8 @@ export class PlayPage extends LitElement {
             class="lg:hidden h-[calc(env(safe-area-inset-top)+56px)] -mb-4"
           ></div>
 
-          <!-- Left column: news banner + identity row, stacked tight. -->
+          <!-- Left column: identity row, stacked tight. -->
           <div class="flex flex-col gap-2 min-w-0">
-            <news-box></news-box>
-
             <!-- Identity row: username over the currently selected cosmetic background. -->
             <div
               class="relative bg-surface border-y border-white/10 overflow-visible flex items-center sm:min-h-[60px] sm:flex-1 sm:z-20 sm:border-y-0 sm:rounded-xl"
