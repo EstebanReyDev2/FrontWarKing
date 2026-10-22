@@ -9,7 +9,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 
 | Grupo | Estado | Commit |
 | --- | --- | --- |
-| 1 · Publicidad, tracking y noticias | Hecho | `1b1022580` |
+| 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Siguiente | — |
 | 3 · Pagos y monetización | Pendiente | — |
 | 4 · Progresión comercial y cosméticos | Pendiente | — |
