@@ -11,7 +11,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | --- | --- | --- |
 | 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
-| 3 · Pagos y monetización | Pendiente | — |
+| 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
 | 4 · Progresión comercial y cosméticos | Pendiente | — |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
 | 6 · Recorte de `Api.ts` | Pendiente | — |
@@ -42,6 +42,23 @@ La suite bajó de tamaño a propósito: se borraron tests de features que ya no
 existen (shell de escritorio, portales, wishlist, handoff, link modal, avisos de
 Steam) y se podaron los casos de otros archivos que simulaban el shell o los
 portales. El detalle está en el mensaje de `1cfcedc25`.
+
+### Resultado del Grupo 3
+
+Dos corridas completas consecutivas: **88 fallos por corrida** —los 87 de la
+línea base más el flaky conocido `InventoryModal · reacts to all settings keys
+changed outside Inventory`—, cero nombres nuevos. Typecheck y lint en 0.
+
+Se borraron 18 archivos de test (10.031 líneas entre código y tests) que cubrían
+checkout, suscripciones, creator codes, tienda y nudges, y se podaron casos de
+`CosmeticLockerIntegration`, `EquippedCosmetics`, `WinModal` y
+`CosmeticsTierListing`. El detalle de qué se quitó de cada archivo está en el
+mensaje de `fb7d7e0a1` y en el reporte del grupo.
+
+`@stripe/stripe-js` salió de `package.json` y del lockfile: era la única
+dependencia de pago y sólo la importaban `StripeInline.ts` e `InlineCheckout.ts`.
+`resources/lang/en.json` perdió 111 claves huérfanas.
+
 
 ## Contratos del engine y del netcode
 
@@ -143,6 +160,24 @@ comportamiento observable no cambia.
 **Cuándo:** Fase 2, tarea "limpiar ramas muertas de DesktopShell/GamePortal/
 SteamSDK" (las ramas `if (isDesktopShell())` y los `gamePortal.*` sin efecto).
 
+### `Payments` como fachada inerte
+
+- `src/client/Payments.ts` — sólo cuatro símbolos: `paymentsProvider()` →
+  `"stripe"`, `startPurchase()` → outcome `error` con `store.purchase_failed`,
+  `purchaseOutcomeMessage()` y `classifyPurchaseReturn()`. Sin Stripe, sin Steam,
+  sin llamadas a `Api.ts`.
+
+**Por qué:** `Cosmetics.ts` (Grupo 4) sigue importando esos cuatro símbolos para
+los botones de compra con moneda blanda/dura y para el retorno
+`#purchase-completed`. Borrarlos ahora obliga a cirugía sobre 1.699 líneas de
+cosméticos y mezcla el Grupo 3 con el 4. La fachada no abre ninguna pasarela:
+`startPurchase` siempre devuelve el error que el jugador ya veía cuando el
+checkout no estaba disponible.
+
+**Cuándo:** Grupo 4, cuando se borren `purchaseCosmetic` y
+`handlePurchaseReturn` de `Cosmetics.ts`. Ahí desaparecen `Payments.ts` y sus
+tipos.
+
 ### Referencias muertas que quedan a propósito
 
 - `src/client/GameModeSelector.ts` consulta `<desktop-status-bar>`, que ya no
@@ -155,13 +190,28 @@ SteamSDK" (las ramas `if (isDesktopShell())` y los `gamePortal.*` sin efecto).
   auto-retry se quitaron porque simulaban un shell que ya no existe.
 - `src/client/SteamLink.ts` y `LinkResult.ts` quedan por ser parte del login
   (Fase 2), aunque la UI que los abría ya no exista.
+- `src/client/EquippedCosmetics.ts` (`storeRouteFor`) y
+  `src/client/components/EquippedCosmeticsRow.ts` siguen armando deep links
+  `#modal=store...`; la fila los abre en una pestaña nueva. El router descarta
+  un `#modal=` desconocido con `replaceHash("")` y devuelve `true`, así que la
+  pestaña aterriza en la home y no hay excepción.
+- `src/client/InventoryModal.ts` hace lo mismo al elegir un cosmético no
+  poseído (`window.location.hash = "modal=store&tab=cosmetics"`). Es Grupo 4;
+  se borra junto con la tienda de cosméticos. La clave `main.store` sigue en
+  `en.json` justamente por este botón.
+- Los tests `EquippedCosmetics.test.ts`, `EquippedCosmeticsRow.test.ts` e
+  `InventoryModal.test.ts` siguen afirmando el string del hash; pasan porque la
+  función que lo arma no cambió.
 
 ### `SteamNotices` se borró
 
 Sus únicos consumidores (`BootInterrupts.ts` y `Main.ts`) eran Steam puro. Con él
 se fue el interrupt `steam-notice` del pipeline de arranque y sus claves de
-traducción. `SteamGrantNotices` (meses de Steam Plus) sigue: es monetización y se
-va en el Grupo 3 junto con el resto de ese pipeline.
+traducción. `SteamGrantNotices` (meses de Steam Plus) sigue: no es checkout y
+está entrelazado con el arranque de sesión. Se va en el Grupo 4, junto con el
+resto del copy de suscripciones, o en Fase 2 si el arranque se reescribe antes.
+En una instalación sin compras de Steam queda inerte: no hay grants de Steam que
+avisar.
 
 ### Smoke test del Grupo 2
 
@@ -176,6 +226,32 @@ Qué mirar: la home no muestra wishlist ni botones de portal; el footer no dice
 `(Steam v…)`; Ajustes no tiene pestaña Display ni "Open Lobby Links in Steam"; y
 la partida contra bots arranca y corre.
 
+### Smoke test del Grupo 3
+
+```
+npm run dev
+```
+
+Abrí `http://localhost:9000`.
+
+1. **Home y consola.** La barra de navegación no tiene "STORE" ni el punto rojo.
+   La consola no muestra errores nuevos al cargar. Probá `#modal=store` en la
+   URL: no abre nada, el hash se limpia y no hay excepción.
+2. **Single player.** "Play" → "Single Player" → mapa y bots → empezar. La
+   partida arranca y corre. Al terminar, el modal de victoria muestra los
+   cosméticos promocionados pero **sin** botones de compra.
+3. **Host Lobby.** "Play" → "Host Lobby" → configurar y crear. En dev el gate de
+   suscripción ya se saltaba; en un build de producción ya no aparece el cartel
+   de "subscription required". El flujo de listar público abre el diálogo de
+   listado. Si el server rechaza por entitlement, el error viene del server y es
+   esperado hasta Fase 2.
+4. **Cuenta.** Abrí el menú de cuenta: no hay panel de creator code. La moneda
+   sigue visible y el diálogo de moneda insuficiente ya no ofrece "comprar".
+5. **Consola del navegador.** No debería haber
+   `Failed to fetch dynamically imported module` por `Store`, `StripeInline` o
+   `SubscriptionModal`. `steam-link-modal unavailable` sólo puede aparecer si
+   tocás un flujo de link de Steam, nunca en el arranque.
+
 
 ### `window.adsEnabled`
 
@@ -184,6 +260,31 @@ la partida contra bots arranca y corre.
   sesión.
 
 **Cuándo:** Fase 2, con el login.
+
+## Pagos: qué se conserva
+
+### `SubscriptionPolicy.ts`
+
+- `STEAM_TIER_CHANGE_IN_APP = false`.
+
+**Por qué:** es una constante pura, sin dependencias, que `Cosmetics.ts` lee
+para decidir el copy de cambio de tier. No hay lógica de pago.
+
+**Cuándo:** Grupo 4, junto con `Payments.ts`.
+
+### `CurrencyDisplay` e `InsufficientCurrencyDialog`
+
+- `src/client/components/CurrencyDisplay.ts`
+- `src/client/components/InsufficientCurrencyDialog.ts`
+
+**Por qué:** son UI de economía interna (plutonio/caps), no checkout.
+`CurrencyDisplay` lo usan `AccountModal`, `ClanModal` y cuatro componentes de
+clan (Grupo 5); `InsufficientCurrencyDialog` lo usan `HostLobbyModal` y
+`TribesPanel` (Grupo 5). Borrarlos en el Grupo 3 obliga a tocar clanes y el
+hosting en la misma tarea. El diálogo quedó dismiss-only: ya no enlaza a una
+tienda que no existe.
+
+**Cuándo:** Grupo 5, con la economía de clanes y tribus.
 
 ## Terceros que se quedan
 
@@ -217,3 +318,14 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   del proyecto original.
 - Los `window.PageOS` / analytics de terceros que aparezcan dentro de
   `src/client` (revisar en Fase 2).
+- `src/client/Api.ts` conserva `createPaymentsCheckout`, `finalizeSteamOrder` y
+  sus tipos, ya sin consumidores en el cliente. Se van con el recorte de `Api.ts`
+  (Grupo 6) o con la reescritura del netcode.
+- `ClientEnv.stripePublishableKey()` y el bloque `stripePublishableKey` de
+  `index.html`/`RenderHtml`/`ServerEnv` quedaron sin consumidor al borrar
+  `StripeInline`. Son config del bootstrap; se van con el recorte de `Api.ts` o
+  con Fase 2.
+- `src/server` conserva los endpoints de pago; son server, no entran en la
+  limpieza del cliente. Fase 2.
+- `Cosmetics.ts` conserva `purchaseCosmetic` y `handlePurchaseReturn` hasta el
+  Grupo 4; hoy llaman a la fachada inerte.
