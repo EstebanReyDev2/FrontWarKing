@@ -111,8 +111,7 @@ describe("<difficulty-info>", () => {
   // The bubble's text comes from translateText() at render time, and the
   // element's only property never changes -- so nothing re-renders it once the
   // language files finish loading. LangSelector.applyTranslation() has to
-  // requestUpdate() it by tag, or it keeps showing raw keys (as <cosmetic-info>
-  // does for the same reason).
+  // requestUpdate() it by tag, or it keeps showing raw keys.
   it("recovers from rendering before the translations loaded", async () => {
     info = document.createElement("difficulty-info") as DifficultyInfo;
     info.difficultyKey = Difficulty.Easy;

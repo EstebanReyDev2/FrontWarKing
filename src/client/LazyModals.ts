@@ -19,7 +19,6 @@ const modules: Record<string, () => Promise<unknown>> = {
   "game-stats-modal": () => import("./GameStatsModal"),
   "help-modal": () => import("./HelpModal"),
   "host-lobby-modal": () => import("./HostLobbyModal"),
-  "inventory-modal": () => import("./InventoryModal"),
   "join-lobby-modal": () => import("./JoinLobbyModal"),
   "leaderboard-modal": () => import("./LeaderboardModal"),
   "matchmaking-modal": () => import("./Matchmaking"),

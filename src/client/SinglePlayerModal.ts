@@ -1306,9 +1306,8 @@ export class SinglePlayerModal extends BaseModal {
       //      including Main's gameplayStart() and incrementGamesPlayed().
       // resolveNameAndCosmetics() above is deliberately NOT gated: its only
       // writes are validating stored cosmetic selections against the catalog
-      // and profile, which happens on any cosmetics resolution (menu
-      // background, store, inventory) rather than as a consequence of this
-      // start.
+      // and profile, which happens on any cosmetics resolution (such as the
+      // menu background) rather than as a consequence of this start.
       if (attempt !== this.startAttempt) return;
 
       const detail = await build(prepared, usernameInput);

@@ -51,10 +51,9 @@ const STATE_META: Record<
   },
 };
 
-// The store's Tribes tab: buy a custom bot tribe name and see the ones you own.
-// Self-contained (fetches its own list) like <effects-grid>; the store passes
-// in the logged-in user so the panel can gate on login and refresh the header
-// balance after a purchase.
+// Buy a custom bot tribe name and see the ones you own. Self-contained
+// (fetches its own list); the caller passes in the logged-in user so the panel
+// can gate on login and refresh the header balance after a purchase.
 @customElement("tribes-panel")
 export class TribesPanel extends LitElement {
   @property({ attribute: false }) userMeResponse: UserMeResponse | false =

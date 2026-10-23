@@ -96,13 +96,6 @@ export class MobileNavBar extends LitElement {
           data-i18n="main.play"
         ></button>
         <button
-          class="${MOBILE_ITEM} ${currentPage === "page-inventory"
-            ? "active"
-            : ""}"
-          data-page="page-inventory"
-          data-i18n="main.inventory"
-        ></button>
-        <button
           class="${MOBILE_ITEM}"
           data-page="page-leaderboard"
           data-i18n="main.leaderboard"

@@ -588,33 +588,9 @@
     "traitor_neighbor_info": "You can betray traitors without becoming a traitor yourself."
   },
   "cosmetics": {
-    "adfree": "ad-free for life!",
-    "ai_label": "Made with AI assistance",
-    "artist_label": "Artist:",
-    "color_label": "Color:",
-    "common": "Common",
-    "epic": "Epic",
-    "free": "+{numFree} BONUS!",
     "hard": "Plutonium",
-    "legendary": "Legendary",
-    "pack_includes": "Includes:",
-    "pack_more_items": "+{count} more",
-    "pattern_preview": "Pattern preview",
-    "per_day": "/day",
-    "per_month": "/month",
-    "public_lobbies": "Create public lobbies",
-    "public_lobbies_info": "Host your own custom lobbies in the public lobby list. Joining public lobbies is always free.",
-    "rare": "Rare",
-    "search": "Search...",
     "soft": "Caps",
-    "type_crown": "Crown",
-    "type_effect": "{type} Effect",
-    "type_flag": "Flag",
-    "type_skin": "Skin",
-    "uncommon": "Uncommon",
-    "usd_value": "Value: {usd}",
-    "verified_name": "Verified username",
-    "verified_name_info": "Your username is reserved for your account and shows a verified badge in-game."
+    "type_flag": "Flag"
   },
   "desktop_gate": {
     "back_to_game": "Back to Game",
@@ -729,20 +705,8 @@
     "veryfast": "Very Fast"
   },
   "effects": {
-    "nukeType": {
-      "atom": "Atom",
-      "hydro": "Hydrogen",
-      "mirvWarhead": "MIRV"
-    },
-    "type": {
-      "nukeExplosion": "Nuke Explosion",
-      "nukeTrail": "Nuke Trail",
-      "railroad": "Railroad",
-      "structures": "Structures",
-      "train": "Train",
-      "transportShipTrail": "Boat Trail",
-      "warship": "Warship"
-    }
+    "nukeType": {},
+    "type": {}
   },
   "emoji_table": {
     "diplomacy": "Diplomacy",
@@ -1213,31 +1177,7 @@
     "waiting": "Waiting for players..."
   },
   "inventory": {
-    "equipped": "Equipped",
-    "load_failed": "Couldn't load your inventory. Please reload and try again.",
-    "loading": "Loading inventory…",
-    "loadout": "Your loadout",
-    "loadout_add": "New loadout",
-    "loadout_applied": "Equipped loadout {name}",
-    "loadout_category_label": "{category}: {summary}",
-    "loadout_delete_target": "Delete {name}",
-    "loadout_deleted": "Deleted loadout {name}",
-    "loadout_limit": "You can save up to {count} loadouts.",
-    "loadout_presets": "Loadouts",
-    "loadout_saved": "Saved loadout {name}",
-    "loadout_slot": "Loadout {name}",
-    "no_owned_crowns": "You don't own any crowns yet.",
-    "no_owned_effects_of_type": "You don't own any {type} effects yet.",
-    "no_owned_skins": "You don't own any skins yet.",
-    "retry": "Retry",
-    "selected_cosmetic": "Selected {name}",
-    "selected_cosmetic_variant": "{name} ({variant})",
-    "showing_effects": "Effects equipped: {count}",
-    "sign_in_for_cosmetics": "Sign in or create an account to access your skins, crowns, and effects.",
-    "title": "Inventory",
-    "unequip": "Unequip",
-    "unequip_all": "Unequip all",
-    "unequipped_all": "Unequipped everything"
+    "selected_cosmetic_variant": "{name} ({variant})"
   },
   "ios_banner": {
     "got_it": "Got it",
@@ -1336,7 +1276,6 @@
     "github": "GitHub",
     "go_to_troubleshooting": "Go to our troubleshooting page",
     "help": "Help",
-    "inventory": "Inventory",
     "join": "Join Lobby",
     "leaderboard": "Leaderboard",
     "login_discord": "Login with Discord",
@@ -1349,7 +1288,6 @@
     "settings": "Settings",
     "sign_in": "Sign in",
     "solo": "Solo",
-    "store": "Store",
     "terms_of_service": "Terms of Service",
     "title": "OpenFront (ALPHA)",
     "troubleshooting": "Troubleshooting",
@@ -1650,8 +1588,6 @@
     "betrayals": "Betrayals",
     "break_alliance": "Break Alliance",
     "chat": "Chat",
-    "cosmetic_get_label": "{name} (Get it in the store)",
-    "cosmetics": "Equipped",
     "emotes": "Emojis",
     "flip_rocket_trajectory": "Flip rocket trajectory",
     "gold": "Gold",
@@ -1987,27 +1923,16 @@
     "confirm_subscribe_over_grant_no_days": "Start a paid {tier} subscription now? Your free access ends immediately, and the time left on it is not refunded and not added to your paid time.",
     "confirm_tier_change_steam": "Subscribe to {tier} now? Your new tier starts immediately at full price, and the rest of your current month is not refunded.",
     "confirm_upgrade": "Upgrade to {tier}? You'll be charged the prorated difference now.",
-    "crowns": "Crowns",
     "currency_pack_purchase_success": "Currency pack purchase successful!",
     "custom_currency_purchase_success": "Plutonium purchase successful!",
-    "effects": "Effects",
-    "flags": "Flags",
     "insufficient_currency_body": "You need {amount, number} more {currency} to buy {item}.",
     "insufficient_currency_title": "Insufficient {currency}",
     "login_required": "You must be logged in to purchase with currency.",
     "manage_billing": "Manage billing",
-    "no_effects": "No effects available. Check back later for new items.",
     "no_tribes": "You haven't bought any tribe names yet.",
     "pack_already_owned": "You already own {items}. Nothing was charged.",
     "pack_debt": "Your Plutonium balance is {debt} in debt. Settle it before buying.",
     "pack_unavailable": "This bundle is no longer available.",
-    "patterns": "Skins",
-    "preview_cosmetic": "In-Game Preview",
-    "preview_error": "Failed to load in-game preview.",
-    "preview_salvo_count": "{count, plural, one {Single (x#)} other {Salvo (x#)}}",
-    "preview_salvo_toggle": "Toggle Salvo Mode",
-    "preview_skin_colors": "Skin colors",
-    "preview_team_colors": "Team colors",
     "purchase_failed": "Purchase failed. Please try again.",
     "purchase_pending": "Your purchase is still being processed. It will appear in your account shortly — check your order history if it doesn't.",
     "purchase_success": "Purchase succeeded: {name}",
@@ -2073,8 +1998,7 @@
   "territory_patterns": {
     "pattern": {
       "default": "Default"
-    },
-    "select_skin": "Skin"
+    }
   },
   "token_login_modal": {
     "success": "Successfully logged in as {email}!",

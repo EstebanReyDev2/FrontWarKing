@@ -438,11 +438,6 @@ class Client {
       tag: "troubleshooting-modal",
       pageId: "page-troubleshooting",
     });
-    modalRouter.register("inventory", {
-      tag: "inventory-modal",
-      pageId: "page-inventory",
-    });
-
     // Kick the server-list fetch off here, before anything below awaits the
     // network, so it overlaps with the rest of boot: by the time a player
     // can click Join or Create the list is already known and the click
@@ -1045,7 +1040,6 @@ class Client {
       // above only ever reaches the page's inline one.
       "#game-settings",
       "troubleshooting-modal",
-      "inventory-modal",
       "language-modal",
       "account-button",
       "leaderboard-button",
