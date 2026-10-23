@@ -7,11 +7,10 @@ export type { PaymentsProvider };
  * Inert payment facade.
  *
  * Phase 1 removed the web checkout (Stripe) and the subscription/store
- * surfaces. The cosmetics module still owns soft/hard-currency purchases and
- * the `#purchase-completed` return copy until the cosmetic cleanup group
- * lands, so it keeps importing these four symbols. None of them reaches a
- * payment rail any more: `startPurchase` always reports an error and the
- * helpers classify values that can no longer be produced.
+ * surfaces. Group 4b removed the cosmetic purchase UI, so nothing imports this
+ * facade any more; it stays only until 4c deletes it. None of the helpers
+ * reaches a payment rail: `startPurchase` always reports an error and the
+ * classifiers cover values that can no longer be produced.
  *
  * The desktop shell's Steam microtransaction bridge was removed with the
  * shell, so the only provider name left is the web one.
