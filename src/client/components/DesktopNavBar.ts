@@ -75,26 +75,6 @@ export class DesktopNavBar extends LitElement {
           data-i18n="main.play"
         ></button>
         <!-- Desktop Navigation Menu Items -->
-        <div class="relative no-game-portal">
-          <button
-            class="nav-menu-item ${currentPage === "page-item-store"
-              ? "active"
-              : ""} text-white/70 hover:text-malibu-blue  font-medium tracking-wider uppercase cursor-pointer transition-colors [&.active]:text-malibu-blue "
-            data-page="page-item-store"
-            data-i18n="main.store"
-            @click=${this._notifications.onStoreClick}
-          ></button>
-          ${this._notifications.showStoreDot()
-            ? html`
-                <span
-                  class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"
-                ></span>
-                <span
-                  class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"
-                ></span>
-              `
-            : ""}
-        </div>
         <button
           class="nav-menu-item ${currentPage === "page-inventory"
             ? "active"

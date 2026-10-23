@@ -11,7 +11,6 @@ import {
   TeamCountConfig,
 } from "@openfront/engine-api/Schemas";
 import { DoomsdayClockSpeed } from "@openfront/engine-lib/game/DoomsdayClock";
-import { GameEnv } from "@openfront/shared/configuration/Env";
 import { EventBus } from "@openfront/shared/EventBus";
 import {
   ClientInfo,
@@ -118,12 +117,7 @@ export class HostLobbyModal extends BaseModal {
   @state() private lobbyCreatorClientID: string = "";
   @state() private lobbyStartAt: number | null = null;
   @state() private serverTimeOffset: number = 0;
-  // Whether this user may actually make the lobby public (the API's
-  // canCreatePublicLobbies entitlement, or anyone in dev). The toggle itself
-  // is always shown.
-  @state() private canListPublicly: boolean = false;
   @state() private publiclyListed: boolean = false;
-  @state() private showSubscriptionRequired: boolean = false;
   @state() private showListLobbyDialog: boolean = false;
   // Server timestamp when the listed lobby auto-starts (from lobby info).
   @state() private autoStartAt: number | null = null;
@@ -406,10 +400,6 @@ export class HostLobbyModal extends BaseModal {
       isPublic === this.publiclyListed ||
       !this.lobbyId
     ) {
-      return;
-    }
-    if (isPublic && !this.canListPublicly) {
-      this.showSubscriptionRequired = true;
       return;
     }
     if (isPublic) {
@@ -825,23 +815,6 @@ export class HostLobbyModal extends BaseModal {
           .info=${this.insufficientInfo}
           @close=${() => (this.insufficientInfo = null)}
         ></insufficient-currency-dialog>
-        ${this.showSubscriptionRequired
-          ? html`<confirm-dialog
-              .heading=${translateText(
-                "host_modal.subscription_required_title",
-              )}
-              .message=${translateText("host_modal.subscription_required_body")}
-              variant="warning"
-              .showClose=${true}
-              .buttons=${"confirmOnly"}
-              .confirmText=${translateText("host_modal.view_subscriptions")}
-              @cancel=${() => (this.showSubscriptionRequired = false)}
-              @confirm=${() => {
-                this.showSubscriptionRequired = false;
-                window.location.href = "/#modal=store&tab=subscriptions";
-              }}
-            ></confirm-dialog>`
-          : ""}
       </div>
     `;
   }
@@ -854,11 +827,6 @@ export class HostLobbyModal extends BaseModal {
     this.leaveLobbyOnClose = true;
     this.startLobbyUpdates();
     void getUserMe().then((userMe) => {
-      // Dev skips the entitlement gate (matching the server) so the
-      // listing flow is testable locally.
-      this.canListPublicly =
-        ClientEnv.env() === GameEnv.Dev ||
-        (userMe !== false && userMe.player.canCreatePublicLobbies);
       this.hardBalance =
         userMe === false ? 0 : (userMe.player.currency?.hard ?? 0);
     });
@@ -1052,7 +1020,6 @@ export class HostLobbyModal extends BaseModal {
     this.hostCheatStartingGold = false;
     this.hostCheatStartingGoldValue = undefined;
     this.publiclyListed = false;
-    this.showSubscriptionRequired = false;
     this.showListLobbyDialog = false;
     this.queued = false;
     this.queueRequestInFlight = false;

@@ -5,8 +5,9 @@ import { translateText } from "../Utils";
 import "./ConfirmDialog";
 
 /**
- * Shown when the player can't afford a cosmetic. Set `.info` to display it and
- * clear it on `@close`. Plutonium gets a top-up button; caps are dismiss-only.
+ * Shown when the player can't afford something with the in-game currencies.
+ * Set `.info` to display it and clear it on `@close`. Dismiss-only: the store
+ * that used to sell top-ups was removed in phase 1.
  */
 @customElement("insufficient-currency-dialog")
 export class InsufficientCurrencyDialog extends LitElement {
@@ -35,16 +36,8 @@ export class InsufficientCurrencyDialog extends LitElement {
       variant="warning"
       .wide=${true}
       .showClose=${true}
-      .buttons=${info.canTopUp ? "confirmOnly" : "none"}
-      .confirmText=${info.canTopUp
-        ? translateText("store.purchase_currency", { currency: info.currency })
-        : ""}
+      .buttons=${"none"}
       @cancel=${() => this.close()}
-      @confirm=${() => {
-        this.close();
-        // Home path (not just hash) so it also works from in-game (win modal).
-        window.location.href = "/#modal=store&tab=packs";
-      }}
     ></confirm-dialog>`;
   }
 }

@@ -1,6 +1,5 @@
 import { RankedType } from "@openfront/engine-api/game/GameTypes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PurchaseButton } from "../../../../src/client/components/PurchaseButton";
 import {
   fetchCosmetics,
   resolveCosmetics,
@@ -135,7 +134,7 @@ describe("WinModal pattern promotion", () => {
     modal = undefined;
   });
 
-  it("renders three card-and-purchase promotions from four purchasable patterns", async () => {
+  it("renders three cosmetic promotions from four purchasable patterns", async () => {
     const purchasablePatterns: ResolvedCosmetic[] = [
       "aurora",
       "blaze",
@@ -172,12 +171,6 @@ describe("WinModal pattern promotion", () => {
     const promotions = modal.querySelectorAll("[data-win-cosmetic-promo]");
     expect(promotions).toHaveLength(3);
     expect(modal.querySelectorAll("cosmetic-card")).toHaveLength(3);
-    expect(modal.querySelectorAll("purchase-button")).toHaveLength(3);
-    for (const button of modal.querySelectorAll<PurchaseButton>(
-      "purchase-button",
-    )) {
-      expect(button.rarity).toBe("rare");
-    }
     for (const card of modal.querySelectorAll("cosmetic-card")) {
       expect(card.querySelector("[data-cosmetic-main]")?.tagName).toBe("DIV");
       expect(card.querySelectorAll("button")).toHaveLength(0);
@@ -187,5 +180,4 @@ describe("WinModal pattern promotion", () => {
     expect(modal.querySelectorAll(legacyButtonTag)).toHaveLength(0);
     expect(modal.querySelectorAll(legacyContainerTag)).toHaveLength(0);
   });
-
 });

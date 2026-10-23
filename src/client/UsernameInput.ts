@@ -507,17 +507,9 @@ export class UsernameInput extends LitElement {
       window.location.hash = "modal=change-username";
       return;
     }
-    const goStore = await showInGameConfirm(
-      translateText("username.verified_sub_required"),
-      {
-        heading: translateText("username.verified_heading"),
-        variant: "warning",
-        confirmText: translateText("username.verified_sub_required_confirm"),
-      },
-    );
-    if (goStore) {
-      window.location.hash = "modal=store&tab=subscriptions";
-    }
+    await showInGameAlert(translateText("username.verified_sub_required"), {
+      heading: translateText("username.verified_heading"),
+    });
   }
 
   /**

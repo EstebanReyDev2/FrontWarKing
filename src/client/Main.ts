@@ -41,13 +41,8 @@ import type { JoinLobbyResult } from "./ClientGameRunner";
 import {
   broadcastFreshUserMe,
   getPlayerCosmeticsRefs,
-  handlePurchaseReturn,
   translateCosmetic,
 } from "./Cosmetics";
-import {
-  consumeCreatorCodePath,
-  resumePendingCreatorCode,
-} from "./CreatorCode";
 import { desktopPresence, type PresencePayload } from "./DesktopPresence";
 import { subscribeDesktopSessionRecovery } from "./DesktopSessionRecovery";
 import {
@@ -109,7 +104,6 @@ import {
   steamGrantWelcomeDue,
 } from "./SteamGrantNotices";
 import { steamSDK } from "./SteamSDK";
-import type { StoreModal } from "./Store";
 import { initTelemetry } from "./Telemetry";
 import type { TokenLoginModal } from "./TokenLoginModal";
 import {
@@ -129,7 +123,6 @@ import { UsernameInput } from "./UsernameInput";
 import { UserSettings } from "./UserSettings";
 import "./components/BannedModal";
 import "./components/MarketingConsentToast";
-import "./components/PurchaseNudgeModal";
 import {
   installCtrlWheelZoomBlocker,
   installDoubleTapZoomBlocker,
@@ -286,7 +279,6 @@ class Client {
   private joinModal: JoinLobbyModal;
   private gameModeSelector: GameModeSelector;
   private userSettings: UserSettings = new UserSettings();
-  private storeModal: StoreModal;
   private tokenLoginModal: TokenLoginModal;
   private matchmakingModal: MatchmakingModal;
   private rewardsModal: RewardsModal;
@@ -334,7 +326,7 @@ class Client {
   private turnstileTokenPromise: Promise<TurnstileToken> | null = null;
 
   async initialize(): Promise<void> {
-    // FIRST, ahead of consumeCreatorCodePath() and of handleUrl() below --
+    // FIRST, ahead of handleUrl() below --
     // ahead of every history write this client performs. A page served under
     // `/v/<commit>/` is pinned to that build, and three guards depend on
     // knowing it (isPinnedToAVersion, currentPagePath, ClientGameRunner's
@@ -352,21 +344,6 @@ class Client {
 
     // Stale key still in existing players' storage; nothing reads it.
     localStorage.removeItem("achievements.pushed");
-
-    // A store referral banner / account "copy link" hands out `/c/<code>`.
-    // There's nothing to open here yet -- the code only does anything once
-    // the player is signed in (resumePendingCreatorCode in onUserMe handles
-    // that), so this just stashes it and cleans the URL. See CreatorCode.ts
-    // for why an invalid code is silently dropped and the path is stripped
-    // either way.
-    //
-    // Must run before ANY await below (including userAuth()): onUserMe() can
-    // fire resumePendingCreatorCode() as soon as getUserMe() settles, and
-    // getUserMe() is kicked off right after userAuth() resolves -- racing
-    // this against handleUrl() (which used to stash the code) risked
-    // consuming an empty stash before the code was ever written, losing the
-    // prefill for an already-signed-in visitor hitting /c/CODE directly.
-    consumeCreatorCodePath();
 
     // One mixer for the page: the menu theme here and the SoundManager a game
     // creates later both route through it, so the volume sliders reach both.
@@ -426,10 +403,6 @@ class Client {
     // Register modals with the URL router. Lobby modals (join/host) and
     // matchmaking are intentionally omitted — they own their own URL state
     // (path-based) or none at all.
-    modalRouter.register("store", {
-      tag: "store-modal",
-      pageId: "page-item-store",
-    });
     modalRouter.register("settings", {
       tag: "user-setting",
       pageId: "page-settings",
@@ -446,7 +419,6 @@ class Client {
     // Profile-menu modals: popup style, so no pageId.
     modalRouter.register("account-settings", { tag: "account-settings-modal" });
     modalRouter.register("change-username", { tag: "change-username-modal" });
-    modalRouter.register("subscription", { tag: "subscription-modal" });
     modalRouter.register("stats", {
       tag: "game-stats-modal",
       pageId: "page-stats",
@@ -665,16 +637,6 @@ class Client {
       });
     });
 
-    this.storeModal = document.getElementById("page-item-store") as StoreModal;
-
-    window.addEventListener("showPage", (e: any) => {
-      if (typeof e?.detail === "string" && e.detail === "page-play") {
-        setTimeout(() => {
-          this.refreshStore();
-        }, 50);
-      }
-    });
-
     this.tokenLoginModal = document.querySelector(
       "token-login",
     ) as TokenLoginModal;
@@ -747,19 +709,6 @@ class Client {
           `Your player ID is ${userMeResponse.player.publicId}\n` +
             "Sharing this ID will allow others to view your game history and stats.",
         );
-
-        // Resume a creator-code binding flow interrupted by a login redirect
-        // (see CreatorCode.ts's stash comment) -- not gated on cleanHomepage
-        // below: the /c/CODE deep link's stash routinely lands back on
-        // #modal=account (or wherever the login round-trip returns to)
-        // rather than a clean "/".
-        if (
-          resumePendingCreatorCode((code) => {
-            window.location.hash = `modal=account&creatorCode=${encodeURIComponent(code)}`;
-          })
-        ) {
-          return;
-        }
 
         // Popups below only on a clean homepage load, never over a deep link
         // (join URL, #modal=..., #purchase-completed, ...) and never over a
@@ -1140,7 +1089,6 @@ class Client {
       "#game-settings",
       "troubleshooting-modal",
       "inventory-modal",
-      "store-modal",
       "language-modal",
       "account-button",
       "leaderboard-button",
@@ -1149,7 +1097,6 @@ class Client {
       "clan-modal",
       "account-settings-modal",
       "change-username-modal",
-      "subscription-modal",
       "lang-selector",
     ].forEach((tag) => {
       const modal = document.querySelector(tag) as HTMLElement & {
@@ -1293,27 +1240,7 @@ class Client {
       return;
     }
 
-    // The `/c/<code>` share-link path is stashed (and stripped) by
-    // consumeCreatorCodePath() at the very start of initialize(), before this
-    // method is ever scheduled -- see the comment there for why that has to
-    // run ahead of userAuth()/getUserMe() rather than here.
-
     // Handle different hash sections
-    if (decodedHash.startsWith("#purchase-completed")) {
-      handlePurchaseReturn(params, {
-        strip,
-        alertAndStrip,
-        alert: (message: string) => showInGameAlert(message),
-        openTokenLogin: (token) =>
-          whenModalLoaded("token-login", () =>
-            this.tokenLoginModal.openWithToken(token),
-          ),
-        refreshStore: () => this.refreshStore(),
-        reload: () => window.location.reload(),
-      });
-      return;
-    }
-
     if (decodedHash.startsWith("#token-login")) {
       const token = params.get("token-login");
 
@@ -1406,16 +1333,6 @@ class Client {
     if (modalRouter.routeFromHash()) {
       return;
     }
-    if (decodedHash.startsWith("#affiliate=")) {
-      const affiliateCode = decodedHash.replace("#affiliate=", "");
-      strip();
-      if (affiliateCode) {
-        loadModal("store-modal").then(
-          () => this.storeModal?.open({ affiliateCode }),
-          (err) => console.error("store-modal failed to load:", err),
-        );
-      }
-    }
     if (decodedHash.startsWith("#refresh")) {
       window.location.href = homeHref();
     }
@@ -1444,12 +1361,6 @@ class Client {
     return customElements.get("matchmaking-modal")
       ? this.matchmakingModal
       : null;
-  }
-
-  private refreshStore(): void {
-    // The store loads on demand (see LazyModals); until it has, there's
-    // nothing to refresh.
-    if (customElements.get("store-modal")) this.storeModal?.refresh();
   }
 
   // Returns the requeue mode ("/?requeue" = 1v1, "/?requeue=2v2" = 2v2,
@@ -2107,7 +2018,6 @@ const bootstrap = () => {
   if (gamePortal.isOnGamePortal()) {
     document.documentElement.classList.add("game-portal");
   }
-
 };
 
 if (document.readyState === "loading") {

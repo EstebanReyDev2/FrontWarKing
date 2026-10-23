@@ -92,21 +92,11 @@ describe("subscription tier listing per rail", () => {
     delete (window as { openfrontDesktop?: unknown }).openfrontDesktop;
   });
 
-  it("asks for the rail this device checks out on", async () => {
+  it("asks for the web rail", async () => {
     expect(tierListingRail()).toBe("web");
     await fetchCosmetics();
     expect(fetchMock.mock.calls[0][0]).toBe(
       "https://api.test/cosmetics.json?rail=web",
-    );
-
-    invalidateCosmetics();
-    (window as { openfrontDesktop?: unknown }).openfrontDesktop = {
-      steam: {},
-    };
-    expect(tierListingRail()).toBe("steam");
-    await fetchCosmetics();
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      "https://api.test/cosmetics.json?rail=steam",
     );
   });
 

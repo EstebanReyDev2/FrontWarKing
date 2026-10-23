@@ -1,5 +1,5 @@
 import { assetUrl } from "@openfront/shared/AssetUrls";
-import { html, LitElement, TemplateResult } from "lit";
+import { html, LitElement } from "lit";
 import { customElement } from "lit/decorators.js";
 import { NavNotificationsController } from "./NavNotificationsController";
 
@@ -55,13 +55,6 @@ export class MobileNavBar extends LitElement {
     });
   }
 
-  private _renderDot(color: string): TemplateResult {
-    return html`<span class="relative ml-2 shrink-0 -mt-2 w-2 h-2">
-      <span class="absolute inset-0 ${color} rounded-full animate-ping"></span>
-      <span class="absolute inset-0 ${color} rounded-full"></span>
-    </span>`;
-  }
-
   render() {
     window.currentPageId ??= "page-play";
     const currentPage = window.currentPageId;
@@ -102,16 +95,6 @@ export class MobileNavBar extends LitElement {
           data-page="page-play"
           data-i18n="main.play"
         ></button>
-        <div
-          class="no-game-portal nav-menu-item flex items-center w-full cursor-pointer"
-          data-page="page-item-store"
-          @click=${this._notifications.onStoreClick}
-        >
-          <button class="${MOBILE_ITEM}" data-i18n="main.store"></button>
-          ${this._notifications.showStoreDot()
-            ? this._renderDot("bg-red-500")
-            : ""}
-        </div>
         <button
           class="${MOBILE_ITEM} ${currentPage === "page-inventory"
             ? "active"

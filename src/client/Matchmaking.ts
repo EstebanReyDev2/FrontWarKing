@@ -131,12 +131,6 @@ export class MatchmakingModal extends BaseModal {
           <p class="text-sm text-white/60">
             ${translateText("matchmaking_modal.limit_reached_info")}
           </p>
-          <button
-            @click=${this.openSubscriptions}
-            class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-wider rounded-xl transition-colors"
-          >
-            ${translateText("matchmaking_modal.limit_upsell")}
-          </button>
         </div>
       `;
     }
@@ -203,13 +197,6 @@ export class MatchmakingModal extends BaseModal {
     this.connect();
     return true;
   }
-
-  private openSubscriptions = () => {
-    // The matchmaking modal isn't registered with the modal router, so it
-    // won't be closed by the store opening from the hash change.
-    this.close();
-    window.location.hash = "modal=store&tab=subscriptions";
-  };
 
   // The lobby writes to every queued socket every ~3s (queue-size), so
   // prolonged silence means the connection died without a close frame

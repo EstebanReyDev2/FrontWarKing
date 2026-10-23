@@ -7,9 +7,7 @@ import type { CosmeticCard } from "../../src/client/components/CosmeticCard";
 import "../../src/client/InventoryModal";
 import { fetchCosmetics } from "../../src/client/Cosmetics";
 import type { InventoryModal } from "../../src/client/InventoryModal";
-import "../../src/client/Store";
 import { modalRouter } from "../../src/client/ModalRouter";
-import type { StoreModal } from "../../src/client/Store";
 import {
   PATTERN_KEY,
   USER_SETTINGS_CHANGED_EVENT,
@@ -91,15 +89,10 @@ const userFixture = {
   },
 } as unknown as UserMeResponse;
 
-const yellowKey = "pattern:stripes:yellow";
-const redKey = "pattern:stripes:red";
 const blueKey = "pattern:stripes:blue";
 const greenKey = "pattern:stripes:green";
 
-function cardFor(
-  root: InventoryModal | StoreModal,
-  key: string,
-): CosmeticCard | undefined {
+function cardFor(root: InventoryModal, key: string): CosmeticCard | undefined {
   return [...root.querySelectorAll<CosmeticCard>("cosmetic-card")].find(
     (candidate) =>
       candidate.resolved.key === key ||
@@ -116,7 +109,6 @@ function expectNoNestedInteractiveControls(root: ParentNode): void {
 
 describe("Cosmetic locker integration", () => {
   let inventory: InventoryModal;
-  let store: StoreModal;
   let languageFixture: HTMLElement;
   let settingsChangeListener: EventListener | undefined;
 
@@ -132,14 +124,6 @@ describe("Cosmetic locker integration", () => {
       "inventory.equipped": "Equipped",
       "inventory.loadout": "Loadout",
       "inventory.showing_effects": "{count} effects equipped",
-      "store.cosmetics": "Cosmetics",
-      "store.crowns": "Crowns",
-      "store.effects": "Effects",
-      "store.flags": "Flags",
-      "store.packs": "Packs",
-      "store.patterns": "Skins",
-      "store.subscriptions": "Subscriptions",
-      "store.title": "Store",
     };
     languageFixture = document.createElement("lang-selector");
     Object.assign(languageFixture, {
@@ -170,13 +154,6 @@ describe("Cosmetic locker integration", () => {
     inventory.requestUpdate();
     await inventory.updateComplete;
 
-    store = document.createElement("store-modal") as StoreModal;
-    store.id = "page-item-store";
-    store.inline = true;
-    document.body.appendChild(store);
-    await store.updateComplete;
-    await store.onUserMe(userFixture);
-
     modalRouter.register("inventory", {
       tag: "inventory-modal",
       pageId: "page-inventory",
@@ -192,13 +169,12 @@ describe("Cosmetic locker integration", () => {
       settingsChangeListener = undefined;
     }
     inventory.remove();
-    store.remove();
     languageFixture.remove();
     localStorage.clear();
     history.replaceState(null, "", "/");
   });
 
-  it("separates Store inspection from Inventory equip state", async () => {
+  it("applies an Inventory variant selection and emits one settings change", async () => {
     const settingsEvent = `${USER_SETTINGS_CHANGED_EVENT}:${PATTERN_KEY}`;
     let settingsChangeCount = 0;
     settingsChangeListener = () => settingsChangeCount++;
@@ -217,24 +193,6 @@ describe("Cosmetic locker integration", () => {
       new UserSettings().getSelectedPatternName(catalog)?.colorPalette?.name,
     ).toBe("blue");
     expect(cardFor(inventory, blueKey)?.state).toBe("equipped");
-
-    store.open({ tab: "cosmetics" });
-    await vi.waitFor(() =>
-      expect(cardFor(store, yellowKey)?.activeVariantKey).toBe(yellowKey),
-    );
-    const storeUpdate = vi.spyOn(store, "requestUpdate");
-    cardFor(store, redKey)!
-      .querySelector<HTMLButtonElement>(`[data-variant-key="${redKey}"]`)!
-      .click();
-    await store.updateComplete;
-
-    expect(cardFor(store, redKey)?.activeVariantKey).toBe(redKey);
-    expect(storeUpdate).toHaveBeenCalled();
-    storeUpdate.mockRestore();
-    expect(settingsChangeCount).toBe(1);
-    expect(
-      new UserSettings().getSelectedPatternName(catalog)?.colorPalette?.name,
-    ).toBe("blue");
   });
 
   it("resynchronizes Inventory to a distinct external settings variant", async () => {
@@ -250,24 +208,18 @@ describe("Cosmetic locker integration", () => {
     expect(cardFor(inventory, greenKey)?.state).toBe("equipped");
   });
 
-  it("keeps accessible controls and phone layout markers across both surfaces", async () => {
+  it("keeps accessible controls and phone layout markers", async () => {
     inventory.open({ tab: "skins" });
-    store.open({ tab: "cosmetics" });
-    await vi.waitFor(() => expect(cardFor(store, yellowKey)).toBeDefined());
     await inventory.updateComplete;
 
     expectNoNestedInteractiveControls(inventory);
-    expectNoNestedInteractiveControls(store);
 
     const inventoryCard = cardFor(inventory, blueKey)!;
-    const storeCard = cardFor(store, redKey)!;
-    for (const cosmeticCard of [inventoryCard, storeCard]) {
-      const main = cosmeticCard.querySelector<HTMLButtonElement>(
-        "button[data-cosmetic-main]",
-      );
-      expect(main?.tagName).toBe("BUTTON");
-      expect(main?.type).toBe("button");
-    }
+    const main = inventoryCard.querySelector<HTMLButtonElement>(
+      "button[data-cosmetic-main]",
+    );
+    expect(main?.tagName).toBe("BUTTON");
+    expect(main?.type).toBe("button");
     const inventorySwatches = [
       ...inventoryCard.querySelectorAll<HTMLButtonElement>(
         "button[data-variant-key]",
@@ -287,16 +239,9 @@ describe("Cosmetic locker integration", () => {
     expect(
       inventory.querySelector("[data-inventory-grid]")?.classList,
     ).toContain("grid-cols-2");
-    expect(store.querySelector("[data-store-grid]")?.classList).toContain(
-      "grid-cols-2",
-    );
-    expect(store.querySelector("[data-store-browser]")?.classList).toContain(
-      "grid-cols-1",
-    );
-    expect(store.querySelector("[data-store-browser] aside")).toBeNull();
   });
 
-  it("preserves the Inventory route tab and clears empty Store products", async () => {
+  it("preserves the Inventory route tab", async () => {
     inventory.open({ tab: "skins" });
     await inventory.updateComplete;
     expect(window.location.hash).toBe("#modal=inventory&tab=skins");
@@ -313,23 +258,5 @@ describe("Cosmetic locker integration", () => {
       ),
     );
     expect(window.location.hash).toBe("#modal=inventory&tab=crowns");
-
-    store.open({ tab: "cosmetics" });
-    await vi.waitFor(() =>
-      expect(cardFor(store, yellowKey)?.activeVariantKey).toBe(yellowKey),
-    );
-    cardFor(store, redKey)!
-      .querySelector<HTMLButtonElement>(`[data-variant-key="${redKey}"]`)!
-      .click();
-    await store.updateComplete;
-    expect(cardFor(store, redKey)?.activeVariantKey).toBe(redKey);
-    const crownsTab = [
-      ...store.querySelectorAll<HTMLButtonElement>("button"),
-    ].find((candidate) => candidate.textContent?.trim() === "Crowns")!;
-    crownsTab.click();
-    await store.updateComplete;
-
-    expect(store.querySelector("[data-store-product]")).toBeNull();
-    expect(store.querySelector("purchase-button")).toBeNull();
   });
 });

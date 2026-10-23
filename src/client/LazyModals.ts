@@ -27,8 +27,6 @@ const modules: Record<string, () => Promise<unknown>> = {
   "ranked-modal": () => import("./components/RankedModal"),
   "rewards-modal": () => import("./RewardsModal"),
   "single-player-modal": () => import("./SinglePlayerModal"),
-  "store-modal": () => import("./Store"),
-  "subscription-modal": () => import("./SubscriptionModal"),
   "token-login": () => import("./TokenLoginModal"),
   "troubleshooting-modal": () => import("./TroubleshootingModal"),
   "user-setting": () => import("./UserSettingModal"),

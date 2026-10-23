@@ -2,7 +2,6 @@ import { GameType, RankedType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import type { AllPlayersStats, Winner } from "@openfront/engine-api/Schemas";
 import type { GameXpEligible, Progress } from "@openfront/shared/ApiSchemas";
-import { Pattern } from "@openfront/shared/CosmeticSchemas";
 import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement, TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -17,17 +16,11 @@ import {
 } from "../../../client/Utils";
 import { fetchUserMeUncached, getUserMe, invalidateUserMe } from "../../Api";
 import "../../components/CosmeticCard";
-import { cosmeticSelectionLabel } from "../../components/CosmeticPresentation";
 import type { GameXpPanelState } from "../../components/GameXpPanel";
 import type { LegendCeremony } from "../../components/LegendCeremony";
 import "../../components/ProfileShare";
-import "../../components/PurchaseButton";
 import { Controller } from "../../Controller";
-import {
-  fetchCosmetics,
-  purchaseCosmetic,
-  resolveCosmetics,
-} from "../../Cosmetics";
+import { fetchCosmetics, resolveCosmetics } from "../../Cosmetics";
 import { isDesktopShell } from "../../DesktopShell";
 import { gamePortal } from "../../GamePortal";
 import {
@@ -513,26 +506,16 @@ export class WinModal extends LitElement implements Controller {
 
     this.patternContent = html`
       <div class="flex gap-4 flex-nowrap justify-start items-start">
-        ${selected.map((resolved) => {
-          // Only patterns were selected above.
-          const pattern = resolved.cosmetic as Pattern | null;
-          return html`
+        ${selected.map(
+          (resolved) => html`
             <div data-win-cosmetic-promo class="flex w-40 flex-col gap-2">
               <cosmetic-card
                 .resolved=${resolved}
                 .interactive=${false}
               ></cosmetic-card>
-              <purchase-button
-                .priceHard=${pattern?.priceHard ?? null}
-                .priceSoft=${pattern?.priceSoft ?? null}
-                .rarity=${pattern?.rarity ?? "common"}
-                .itemName=${cosmeticSelectionLabel(resolved)}
-                .onPurchaseHard=${() => purchaseCosmetic(resolved, "hard")}
-                .onPurchaseSoft=${() => purchaseCosmetic(resolved, "soft")}
-              ></purchase-button>
             </div>
-          `;
-        })}
+          `,
+        )}
       </div>
     `;
   }
