@@ -1,7 +1,6 @@
-import { GameType, RankedType } from "@openfront/engine-api/game/GameTypes";
+import { RankedType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import type { AllPlayersStats, Winner } from "@openfront/engine-api/Schemas";
-import type { GameXpEligible, Progress } from "@openfront/shared/ApiSchemas";
 import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement, TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -14,73 +13,12 @@ import {
   translateText,
   TUTORIAL_VIDEO_URL,
 } from "../../../client/Utils";
-import { fetchUserMeUncached, getUserMe, invalidateUserMe } from "../../Api";
-import "../../components/CosmeticCard";
-import type { GameXpPanelState } from "../../components/GameXpPanel";
-import type { LegendCeremony } from "../../components/LegendCeremony";
-import "../../components/ProfileShare";
 import { Controller } from "../../Controller";
-import { fetchCosmetics, resolveCosmetics } from "../../Cosmetics";
-import { isDesktopShell } from "../../DesktopShell";
 import { gamePortal } from "../../GamePortal";
-import {
-  gameShareMoment,
-  momentShareLabel,
-  momentShareText,
-  momentShareUrl,
-} from "../../MomentShare";
 import { Platform } from "../../Platform";
-import { MAX_PRESTIGE, reachedLegendThisGame } from "../../Progression";
-import { resolveXpAccount } from "../../ProgressionAccount";
-import { fetchProgressionConfig, pollGameXp } from "../../ProgressionApi";
-import {
-  applyGameXp,
-  firstGameXp,
-  type PendingGameKind,
-  recordPendingXp,
-  withPendingXp,
-} from "../../ProvisionalProgress";
-import {
-  loadProvisionalXp,
-  type ProvisionalXp,
-  provisionalXpRules,
-  reconcileXp,
-} from "../../ProvisionalXpAtDeath";
 import { PlaySoundEffectEvent } from "../../sound/Sounds";
 import { SendWinnerEvent } from "../../Transport";
 import { GameView } from "../../view";
-
-type LegendCeremonyModule = typeof import("../../components/LegendCeremony");
-
-// What the end-of-game provisional figure is worked out from: the result and
-// the stats this client votes to the server, which the archived record holds.
-interface GameEndUpdate {
-  winner: Winner;
-  allPlayersStats: AllPlayersStats;
-  // The tick the Win update came on: the figure counts time played up to it,
-  // not up to the later moment the worker's snapshot is taken.
-  tick: number;
-}
-
-// How long the end of the game waits on its provisional figure before the
-// section says the XP is being calculated meanwhile. Normally it takes a
-// moment (one ask of the worker), and a flash of "calculating" before the
-// reveal would only be noise.
-const END_PROVISIONAL_GRACE_MS = 500;
-
-// The XP section stays out of the startup bundle: it's fetched when a game
-// starts (see init), long before the game ends, so the reveal never waits on
-// it. Should it still be on its way, the section shows the moment it lands.
-let xpPanelModule: Promise<unknown> | null = null;
-function loadGameXpPanel(): void {
-  xpPanelModule ??= import("../../components/GameXpPanel").catch(
-    (err: unknown) => {
-      // Tried again at the end of the game, or the next one.
-      xpPanelModule = null;
-      console.warn("WinModal: XP section failed to load", err);
-    },
-  );
-}
 
 @customElement("win-modal")
 export class WinModal extends LitElement implements Controller {
@@ -98,52 +36,7 @@ export class WinModal extends LitElement implements Controller {
   @state()
   private isRankedGame = false;
 
-  @state()
-  private patternContent: TemplateResult | null = null;
-
-  // The XP this game earned. Stays hidden unless there is something to say:
-  // no progression, a spectator or a replay never see the section at all.
-  @state()
-  private xpView: GameXpPanelState = { kind: "hidden" };
-  // Polling starts once, at the end of the game.
-  private xpPolling = false;
-  private xpAbort: AbortController | null = null;
-  // The XP result the panel has finished revealing (or skipped to the end
-  // of): the share button waits for it.
-  @state()
-  private xpSettled: GameXpPanelState | null = null;
-  // The signed-in player's public ID, for the share link. Empty when signed
-  // out (or unknown): no share button.
-  @state()
-  private sharePublicId = "";
-  // The provisional figure shown at death (or, for a player still in the
-  // game, at its end), if any: the server's figure is compared with it.
-  private provisionalXp: ProvisionalXp | null = null;
-  // The game's result, from its Win update: a player still in the game at
-  // the end gets a provisional figure worked out from it.
-  private gameEnd: GameEndUpdate | null = null;
-  // A Win update has come: anything read of the account from now on may
-  // already count this game.
-  private gameOverSeen = false;
-  // The account's progress as read while the game was on (init): what a
-  // figure from the end starts from, and is kept as not including.
-  private startAccount: { publicId: string; progress: Progress } | null = null;
-  // A detach cut the end-of-game poll short; re-attaching restarts it (the
-  // Win update that started it is delivered only once).
-  private xpPollAborted = false;
-  // Whose XP the section shows: the Legend ceremony plays once per account.
-  private xpPublicId: string | null = null;
-  // The Legend ceremony, fetched only for a player who could become a Legend
-  // (see preloadLegendCeremony); null until it has arrived.
-  private legendCeremony: LegendCeremonyModule | null = null;
-  private legendCeremonyLoad: Promise<void> | null = null;
-  // Replaceable for tests.
-  loadLegendCeremony: () => Promise<LegendCeremonyModule> = () =>
-    import("../../components/LegendCeremony");
-
   private _title: string;
-
-  private rand = Math.random();
 
   // Override to prevent shadow DOM creation
   createRenderRoot() {
@@ -165,19 +58,10 @@ export class WinModal extends LitElement implements Controller {
           ${this._title || ""}
         </h2>
         <div class="min-h-0 flex-1 overflow-y-auto pr-0.5">
-          <game-xp-panel
-            .view=${this.xpView}
-            .onScreen=${this.isVisible}
-            @xp-reveal-settled=${(e: CustomEvent<GameXpPanelState>) =>
-              (this.xpSettled = e.detail)}
-            .gameType=${this.game?.config().gameConfig().gameType ?? null}
-            @xp-legend=${this.onXpLegend}
-          ></game-xp-panel>
           ${this.innerHtml()}
         </div>
         <!-- Leaving is the quieter action, on the left; staying in the game
-             is the main one, on the right. Sharing a milestone sits between
-             them, or on its own row above where three don't fit. -->
+             is the main one, on the right. -->
         <div class="mt-4 flex flex-wrap justify-between gap-2.5 shrink-0">
           ${this.actionButton(
             "quiet",
@@ -185,7 +69,6 @@ export class WinModal extends LitElement implements Controller {
             () => this._handleExit(),
             "exit",
           )}
-          ${this.renderShare()}
           ${this.isRankedGame
             ? this.actionButton(
                 "main",
@@ -205,64 +88,8 @@ export class WinModal extends LitElement implements Controller {
         </div>
         ${this.renderActionStyles()}
       </div>
-      <legend-ceremony
-        @legend-ceremony-closed=${this.onLegendCeremonyClosed}
-      ></legend-ceremony>
     `;
   }
-
-  // The server's result for this game made the player a Legend: the moment
-  // gets the whole screen, the first time on this account. The XP section
-  // rests on its final state behind it, so Continue comes back to the
-  // settled popup. Should the ceremony not have arrived (a slow or failed
-  // fetch), the XP section plays its own Legend moment instead.
-  private onXpLegend = (e: CustomEvent<GameXpEligible>): void => {
-    const publicId = this.xpPublicId;
-    const legend = this.legendCeremony;
-    if (publicId === null || legend === null) return;
-    if (legend.legendCeremonySeen(publicId)) return;
-    const ceremony = this.querySelector<LegendCeremony>("legend-ceremony");
-    if (ceremony === null) return;
-    e.preventDefault();
-    legend.markLegendCeremonySeen(publicId);
-    ceremony.show({
-      lifetimeXp: e.detail.after.lifetimeXp,
-      at: new Date(),
-      publicId,
-    });
-  };
-
-  // Fetches the Legend ceremony ahead of its moment: once the account is
-  // known to be on its last prestige run, and again (should that have missed
-  // it) as soon as the server's result says this game made a Legend, while
-  // the reveal is still climbing to level 100.
-  private preloadLegendCeremony(): void {
-    if (this.legendCeremonyLoad !== null) return;
-    this.legendCeremonyLoad = this.loadLegendCeremony().then(
-      (module) => {
-        this.legendCeremony = module;
-      },
-      (err: unknown) => {
-        this.legendCeremonyLoad = null;
-        console.warn("WinModal: Legend ceremony failed to load", err);
-      },
-    );
-  }
-
-  // The first of those: where the last run is comes from the config, as the
-  // server may move it, and from the client's own constant only without one.
-  private async preloadIfLastRun(prestige: number): Promise<void> {
-    const config = await fetchProgressionConfig();
-    const last =
-      config !== false && config.maxPrestige > 0
-        ? config.maxPrestige
-        : MAX_PRESTIGE;
-    if (prestige >= last) this.preloadLegendCeremony();
-  }
-
-  private onLegendCeremonyClosed = (): void => {
-    this.querySelector<HTMLElement>('[data-win-action="keep"]')?.focus();
-  };
 
   // The modal's own buttons, textured like the store's tiles and buy buttons:
   // a tinted gradient with a coloured border, and on hover they lift, glow
@@ -282,33 +109,6 @@ export class WinModal extends LitElement implements Controller {
     >
       <span class="relative">${label}</span>
     </button>`;
-  }
-
-  // Sharing a milestone or becoming a Legend, once the reveal has shown it.
-  // Only for the server's result (gameShareMoment), and only for a signed-in
-  // player with a profile to link to.
-  private renderShare(): TemplateResult | null {
-    if (this.sharePublicId === "" || this.xpSettled !== this.xpView) {
-      return null;
-    }
-    const moment = gameShareMoment(this.xpView);
-    if (moment === null || moment.kind === "prestige") return null;
-    const url = momentShareUrl(this.sharePublicId, moment);
-    if (url === null) return null;
-    // Three labelled buttons fit side by side from md up; below that (and
-    // beside a ranked game's requeue button) it takes a row of its own.
-    const placement = this.isRankedGame
-      ? "order-first basis-full"
-      : "order-first basis-full md:order-none md:basis-0 md:flex-1";
-    return html`<profile-share
-      data-win-share
-      class="flex ${placement}"
-      layout="menu"
-      .label=${momentShareLabel(moment)}
-      .url=${url}
-      .text=${momentShareText(moment)}
-      triggerClass="win-action win-action-quiet w-full"
-    ></profile-share>`;
   }
 
   private renderActionStyles(): TemplateResult {
@@ -428,11 +228,7 @@ export class WinModal extends LitElement implements Controller {
     if (!this.isWin && getGamesPlayed() < 3) {
       return this.renderYoutubeTutorial();
     }
-    if (this.rand < 0.5) {
-      return this.discordDisplay();
-    } else {
-      return this.renderPatternButton();
-    }
+    return this.discordDisplay();
   }
 
   renderYoutubeTutorial() {
@@ -463,63 +259,6 @@ export class WinModal extends LitElement implements Controller {
     `;
   }
 
-  renderPatternButton() {
-    return html`
-      <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
-        <h3 class="text-xl font-semibold text-white mb-3">
-          ${translateText("win_modal.support_openfront")}
-        </h3>
-        ${isDesktopShell()
-          ? null
-          : html`<p class="text-white mb-3">
-              ${translateText("win_modal.territory_pattern")}
-            </p>`}
-        <div
-          class="mx-auto w-full overflow-x-auto overflow-y-visible rounded-sm"
-        >
-          <div
-            class="flex min-w-max items-start justify-center gap-4 px-1 py-1"
-          >
-            ${this.patternContent}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  async loadPatternContent() {
-    const me = await getUserMe();
-    const cosmetics = await fetchCosmetics();
-
-    const purchasable = resolveCosmetics(cosmetics, me, null).filter(
-      (r) => r.type === "pattern" && r.relationship === "purchasable",
-    );
-
-    if (purchasable.length === 0) {
-      this.patternContent = html``;
-      return;
-    }
-
-    // Shuffle the array and take patterns. Will always be 3 wide to allow scrolling
-    const shuffled = [...purchasable].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(3, shuffled.length));
-
-    this.patternContent = html`
-      <div class="flex gap-4 flex-nowrap justify-start items-start">
-        ${selected.map(
-          (resolved) => html`
-            <div data-win-cosmetic-promo class="flex w-40 flex-col gap-2">
-              <cosmetic-card
-                .resolved=${resolved}
-                .interactive=${false}
-              ></cosmetic-card>
-            </div>
-          `,
-        )}
-      </div>
-    `;
-  }
-
   discordDisplay(): TemplateResult {
     return html`
       <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
@@ -541,323 +280,17 @@ export class WinModal extends LitElement implements Controller {
     `;
   }
 
-  async show() {
+  show() {
     gamePortal.gameplayStop();
     this.isRankedGame =
       this.game.config().gameConfig().rankedType !== undefined;
     this.isVisible = true;
-    this.requestUpdate();
-    try {
-      await this.loadPatternContent();
-    } catch (error) {
-      console.warn("Failed to load win modal cosmetics", error);
-      return;
-    }
     this.requestUpdate();
   }
 
   hide() {
     this.isVisible = false;
     this.requestUpdate();
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    if (this.xpPollAborted) {
-      this.xpPollAborted = false;
-      void this.updateXp(true);
-    }
-  }
-
-  disconnectedCallback(): void {
-    this.xpAbort?.abort();
-    super.disconnectedCallback();
-  }
-
-  /**
-   * Fills the XP section. `gameOver` is false when the player died while the
-   * game carries on: the server only awards XP once the game is archived, so
-   * that shows a provisional figure worked out here (or, when there can't be
-   * one, says XP comes at the end), and the poll starts when the game really
-   * ends. A player without a figure by then (still in the game, mostly) gets
-   * one from the finished game while the poll runs.
-   */
-  private async updateXp(gameOver: boolean): Promise<void> {
-    if (this.xpPolling) return;
-    // Normally here since the game started; tried again should that fetch
-    // have failed.
-    loadGameXpPanel();
-    try {
-      const game = this.game;
-      // Spectators and replay viewers have no XP of their own, and a game
-      // resumed from a save earns none.
-      if (
-        game.config().isReplay() ||
-        !game.myPlayer() ||
-        game.resumedFromSave()
-      ) {
-        return;
-      }
-      const account = await resolveXpAccount();
-      // /users/@me failed while there is a session: a signed-in player must
-      // not be told to sign in over a network blip, so say nothing.
-      if (account.kind === "unknown") return;
-      if (account.kind === "signed_out") {
-        // Only pitch XP when progression is actually on. There is no
-        // /users/@me progress to go by here, so ask the public config (404
-        // when progression is off; any failure also says nothing).
-        const config = await fetchProgressionConfig();
-        if (config === false || this.xpPolling) return;
-        this.xpView = { kind: "signed_out" };
-        return;
-      }
-      // /users/@me carries progress whenever progression is on (level 1
-      // before a first scored game); absent means off: no section at all.
-      const progress = account.me.player.progress;
-      if (progress === undefined) return;
-      this.sharePublicId = account.me.player.publicId;
-      this.xpPublicId = account.me.player.publicId ?? null;
-      if (!progress.legend) void this.preloadIfLastRun(progress.prestige);
-      // The game may have ended while this was resolving; the end-of-game
-      // call owns the section from then on.
-      if (this.xpPolling) return;
-      if (!gameOver) {
-        const loaded = await this.loadProvisionalXp(progress, null);
-        if (this.xpPolling) return;
-        if (loaded === null) {
-          this.xpView = { kind: "awaiting_end" };
-          return;
-        }
-        const { provisional } = loaded;
-        this.provisionalXp = provisional;
-        this.xpView = { kind: "provisional", provisional, confirming: false };
-        this.keepPendingXp(provisional, loaded.notIn);
-        return;
-      }
-      this.xpPolling = true;
-      const abort = new AbortController();
-      this.xpAbort = abort;
-      // Asked at once; scoring can take a while (the server may replay the
-      // game to settle its winner).
-      const poll = pollGameXp(game.gameID(), { signal: abort.signal });
-      let provisional = this.provisionalXp;
-      const end = this.gameEnd;
-      if (provisional === null && end !== null) {
-        // No figure from a death (the player is still in the game, or had
-        // none): one from the finished game, the win included, unless the
-        // server answers first. Should it be slow to work out, the section
-        // says the XP is being calculated meanwhile.
-        const slow = setTimeout(() => {
-          this.xpView = { kind: "calculating" };
-        }, END_PROVISIONAL_GRACE_MS);
-        // Its own signal, so a server that answers first stops the leftover
-        // worker calls; a detach stops them too.
-        const loadAbort = new AbortController();
-        const stopLoad = () => loadAbort.abort();
-        abort.signal.addEventListener("abort", stopLoad, { once: true });
-        const loaded = await Promise.race([
-          this.loadProvisionalXp(progress, end, loadAbort.signal).catch(
-            (err: unknown) => {
-              console.warn("WinModal: no provisional XP at the end", err);
-              return null;
-            },
-          ),
-          // Only the server's figure beats this one. A poll that gives up
-          // (timed out, unavailable) leaves it to come: it then stays up,
-          // provisional, and kept for the account menu.
-          poll.then((result) =>
-            result === null ? new Promise<never>(() => {}) : null,
-          ),
-        ]);
-        clearTimeout(slow);
-        loadAbort.abort();
-        abort.signal.removeEventListener("abort", stopLoad);
-        if (loaded !== null && !abort.signal.aborted) {
-          provisional = loaded.provisional;
-          this.provisionalXp = provisional;
-          this.keepPendingXp(provisional, loaded.notIn);
-        }
-      }
-      // A provisional figure stays up while the server's is fetched.
-      this.xpView =
-        provisional === null
-          ? { kind: "calculating" }
-          : { kind: "provisional", provisional, confirming: true };
-      const result = await poll;
-      // Detached mid-poll: leave the section be (a provisional figure stays
-      // up, still confirming) and poll again on re-attach (right away if that
-      // happened while this poll was winding down).
-      if (abort.signal.aborted) {
-        this.xpPolling = false;
-        if (this.isConnected) void this.updateXp(true);
-        else this.xpPollAborted = true;
-        return;
-      }
-      // Scored: the figure kept for the account menu and profile is done.
-      if (result !== null && this.xpPublicId !== null) {
-        applyGameXp(
-          this.xpPublicId,
-          result,
-          this.pendingAbout(progress.daily?.day),
-        );
-      }
-      if (result?.eligible && reachedLegendThisGame(result)) {
-        this.preloadLegendCeremony();
-      }
-      if (result === null) {
-        // Timed out, signed out or unreadable: hide rather than show an error
-        // (or, worse, a zero). A provisional figure stays, still provisional.
-        this.xpView =
-          provisional === null
-            ? { kind: "hidden" }
-            : { kind: "provisional", provisional, confirming: false };
-        return;
-      }
-      // A game that unlocked cosmetics changed what the player owns: the
-      // Locker (and everything else reading /users/@me) refetches.
-      if (result.eligible && (result.flares ?? []).length > 0) {
-        invalidateUserMe();
-      }
-      if (provisional === null) {
-        this.xpView = { kind: "result", data: result };
-        return;
-      }
-      const outcome = reconcileXp(provisional.result, result, {
-        disconnectedOpponents: provisional.inputs.disconnectedOpponents,
-        atGameEnd: provisional.inputs.atGameEnd,
-        shown: provisional.response,
-      });
-      if (outcome.drift) {
-        // Not explained by what only the end of the game adds: the client's
-        // copy of the formula may have drifted from the server's.
-        console.warn("Provisional XP differed from the server's", {
-          gameId: result.gameId,
-          provisional: outcome.provisionalTotal,
-          server: result.eligible ? result.breakdown.total : null,
-          provisionalResult: provisional.result,
-          serverResult: result.eligible
-            ? result.breakdown
-            : { reason: result.reason },
-          inputs: provisional.inputs,
-        });
-      }
-      this.xpView = {
-        kind: "result",
-        data: result,
-        reconciled: { provisional, outcome },
-      };
-    } catch (err) {
-      console.warn("WinModal: XP section failed", err);
-      this.xpView = { kind: "hidden" };
-    }
-  }
-
-  // Keeps an eligible provisional figure for the account, so the account
-  // menu, the Account modal and the profile show it (provisionally) until the
-  // API scores the game (ProvisionalProgress.ts). `notIn` is the lifetime XP
-  // of the account it was worked out from, read before the game ended, so
-  // the game can't be in it.
-  // Nothing is asked of the API here: at death the game is still running,
-  // and at the end the poll already is; the account menu's poll picks it up
-  // should neither get an answer.
-  private keepPendingXp(provisional: ProvisionalXp, notIn: number): void {
-    const response = provisional.response;
-    if (this.xpPublicId === null || !response.eligible) return;
-    recordPendingXp(this.xpPublicId, {
-      ...this.pendingAbout(provisional.inputs.dailyDay ?? undefined),
-      gameId: response.gameId,
-      xp: response.breakdown.total,
-      firstGame: firstGameXp(response.breakdown),
-      notIn,
-    });
-  }
-
-  // This game's kind and the API's day stamp, for the day's allowances.
-  private pendingAbout(day: string | undefined): {
-    day?: string;
-    kind?: PendingGameKind;
-  } {
-    const kinds: Partial<Record<GameType, PendingGameKind>> = {
-      [GameType.Public]: "public",
-      [GameType.Private]: "private",
-      [GameType.Singleplayer]: "singleplayer",
-    };
-    return { day, kind: kinds[this.game.config().gameConfig().gameType] };
-  }
-
-  // The provisional XP figure for a player who has just died, or with `end`
-  // for one at the end of the game, and the lifetime XP of the account it
-  // was worked out from; null when there can't be one (see
-  // loadProvisionalXp).
-  private async loadProvisionalXp(
-    progress: Progress,
-    end: GameEndUpdate | null,
-    signal?: AbortSignal,
-  ): Promise<{ provisional: ProvisionalXp; notIn: number } | null> {
-    const progression = await fetchProgressionConfig();
-    if (progression === false || provisionalXpRules(progression) === null) {
-      return null;
-    }
-    if (signal?.aborted) return null;
-    const game = this.game;
-    const myClientID = game.myClientID();
-    if (myClientID === undefined) return null;
-    // A provisional figure starts from where the player is now, and counts
-    // today's allowances as they are now: at death, ask /users/@me afresh
-    // (the page's copy is from when the game started, and a game left
-    // earlier may have been scored since). Past the page's cache, so a failed
-    // ask can't cost the game-end figure its copy; the page's progress stands
-    // in for it. At the end, the account as read while the game was on
-    // (captureStartProgress): any read since could already have this game
-    // in it, should the server score it that quickly, and the page's copy
-    // may have been refetched since (an earlier game scored, a new session).
-    // Only without that, the page's copy. Games left earlier are counted
-    // below.
-    let confirmed = progress;
-    if (end === null) {
-      const fresh = await fetchUserMeUncached();
-      if (fresh !== false && fresh.player.progress !== undefined) {
-        confirmed = fresh.player.progress;
-      }
-    } else if (
-      this.startAccount !== null &&
-      this.startAccount.publicId === this.xpPublicId
-    ) {
-      confirmed = this.startAccount.progress;
-    }
-    // Games left earlier and not scored yet stack underneath this one: it
-    // starts from where their provisional XP took the player, and from the
-    // day's allowances they used (ProvisionalProgress.ts). Nothing is asked:
-    // the stored answers decide.
-    const start =
-      this.xpPublicId === null
-        ? confirmed
-        : withPendingXp(this.xpPublicId, confirmed, progression, game.gameID());
-    const provisional = await loadProvisionalXp({
-      gameId: game.gameID(),
-      myClientID,
-      config: game.config().gameConfig(),
-      progress: start,
-      progression,
-      end: end === null ? undefined : { winner: end.winner },
-      // At the end, the stats this client voted (the Win update's): the
-      // record the server scores, on the tick the game ended. Only who is
-      // disconnected is asked of the worker, without copying every player's
-      // stats again.
-      humanStats:
-        end === null
-          ? () => game.worker.humanStats()
-          : async () => ({
-              disconnectedAt: (await game.worker.humanDisconnects())
-                .disconnectedAt,
-              stats: end.allPlayersStats,
-              tick: end.tick,
-            }),
-      signal,
-    });
-    return provisional === null
-      ? null
-      : { provisional, notIn: confirmed.lifetimeXp };
   }
 
   private _handleExit() {
@@ -887,27 +320,6 @@ export class WinModal extends LitElement implements Controller {
     );
   }
 
-  init() {
-    if (this.game.config().isReplay()) return;
-    loadGameXpPanel();
-    void this.captureStartProgress();
-  }
-
-  // Reads the account's progress, and today's allowances, while the game is
-  // on: it can't include this game yet. Nothing is kept should the answer
-  // only come once the game is over.
-  private async captureStartProgress(): Promise<void> {
-    try {
-      const account = await resolveXpAccount();
-      if (account.kind !== "signed_in" || this.gameOverSeen) return;
-      const { publicId, progress } = account.me.player;
-      if (!publicId || progress === undefined) return;
-      this.startAccount = { publicId, progress };
-    } catch (err) {
-      console.warn("WinModal: no account read at the start", err);
-    }
-  }
-
   tick() {
     const myPlayer = this.game.myPlayer();
     if (
@@ -920,18 +332,13 @@ export class WinModal extends LitElement implements Controller {
       this.hasShownDeathModal = true;
       this._title = translateText("win_modal.died");
       this.eventBus.emit(new PlaySoundEffectEvent("defeat"));
-      void this.updateXp(false);
       this.show();
     }
     const updates = this.game.updatesSinceLastTick();
     const winUpdates = updates?.[GameUpdateType.Win] ?? [];
-    if (winUpdates.length > 0) this.gameOverSeen = true;
-    // Votes the result to the server. The result voted is what a figure from
-    // the end is worked out from: a Win update this client doesn't vote
-    // gives none.
+    // Votes the result to the server.
     const vote = (winner: Winner, allPlayersStats: AllPlayersStats) => {
       this.eventBus.emit(new SendWinnerEvent(winner, allPlayersStats));
-      this.gameEnd ??= { winner, allPlayersStats, tick: this.game.ticks() };
     };
     winUpdates.forEach((wu) => {
       if (wu.winner === undefined) {
@@ -991,8 +398,6 @@ export class WinModal extends LitElement implements Controller {
         this.show();
       }
     });
-    // After the vote, so a figure from the end has what was voted.
-    if (winUpdates.length > 0) void this.updateXp(true);
   }
 
   private playEndOfGameSound(): void {
