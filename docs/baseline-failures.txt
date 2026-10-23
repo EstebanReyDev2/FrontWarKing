@@ -35,7 +35,7 @@ tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of green on 
 tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of main on dev
 tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh defaults to a single worker when NUM_WORKERS is unset
 tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh generates the upstream + worker port map from NUM_WORKERS
-tests/UpdateFlagLatest.test.ts > update.sh flag_latest accepts a 404 immediately ÔÇö the API predates the registry
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest accepts a 404 immediately — the API predates the registry
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (400)
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (401)
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (403)

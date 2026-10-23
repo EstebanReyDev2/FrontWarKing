@@ -12,7 +12,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
 | 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
-| 4 · Progresión comercial y cosméticos | En curso (4a hecho) | `4652d4751`, `781ffb17c`, ver 4a-3 |
+| 4 · Progresión comercial y cosméticos | En curso (4a hecho) | `4652d4751`, `781ffb17c`, `85f8dc8d4` |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
 | 6 · Recorte de `Api.ts` | Pendiente | — |
 
@@ -91,7 +91,7 @@ porque perfil y cuenta todavía los consumían.
 - [x] ~~`src/client/ClientGameRunner.ts`~~ — sin `rememberLobbyRoster` ni wiring de badges
 - [x] ~~`src/client/hud/layers/PlayerPanel.ts`~~ — sin badge de nivel
 
-#### 4a-3 · `refactor: remove the account and profile progression UI`
+#### 4a-3 · `85f8dc8d4`
 
 - [x] ~~`src/client/ProvisionalXp.ts`~~
 - [x] ~~`src/client/XpMultipliers.ts`~~
