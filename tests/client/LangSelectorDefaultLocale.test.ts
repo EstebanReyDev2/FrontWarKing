@@ -43,14 +43,6 @@ describe("LangSelector default locale", () => {
     expect(defaultLocale()).toBe("et-EE");
   });
 
-  // The whole point of consulting Steam: a player whose system is English but
-  // whose Steam is Ukrainian gets Ukrainian.
-  it("prefers a real Steam locale over the OS locale", () => {
-    withShellLocale("uk");
-    withOsLocale("en-GB");
-    expect(defaultLocale()).toBe("uk");
-  });
-
   // The regression this exists to fix. Steam offers ~30 UI languages and we
   // ship 40, so a player whose system is Estonian CANNOT have Estonian Steam
   // -- theirs reports English. Taking that at face value handed them English

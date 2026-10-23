@@ -86,7 +86,6 @@ import { updateAccountNavButton } from "./NavAccountButton";
 import { initNavigation } from "./Navigation";
 import { capturePagePin } from "./PagePin";
 import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
-import { updatePortalNavButton } from "./PortalAccountButton";
 import {
   GroupTokenTracker,
   presenceLobbyId,
@@ -109,16 +108,6 @@ import {
   steamGrantEndedDue,
   steamGrantWelcomeDue,
 } from "./SteamGrantNotices";
-import { steamHandoffMode } from "./SteamHandoff";
-import type { SteamHandoffModal } from "./SteamHandoffModal";
-import {
-  isSteamLinkHash,
-  parseSteamLinkToken,
-  resumePendingSteamLink,
-  type PendingLinkModal,
-} from "./SteamLink";
-import type { SteamLinkModal } from "./SteamLinkModal";
-import { steamNoticeDue, steamNoticeStringsReady } from "./SteamNotices";
 import { steamSDK } from "./SteamSDK";
 import type { StoreModal } from "./Store";
 import { initTelemetry } from "./Telemetry";
@@ -139,7 +128,6 @@ import { parseReplayViewerHash } from "./replay/ReplayViewerRoute";
 import { UsernameInput } from "./UsernameInput";
 import { UserSettings } from "./UserSettings";
 import "./components/BannedModal";
-import "./components/DesktopStatusBar";
 import "./components/MarketingConsentToast";
 import "./components/PurchaseNudgeModal";
 import {
@@ -302,21 +290,6 @@ class Client {
   private tokenLoginModal: TokenLoginModal;
   private matchmakingModal: MatchmakingModal;
   private rewardsModal: RewardsModal;
-  private steamLinkModal: SteamLinkModal;
-  private steamHandoffModal: SteamHandoffModal | null = null;
-  // The Steam link modal loads on demand (see LazyModals), so it's opened
-  // through this, which loads it first.
-  private readonly steamLink: PendingLinkModal = {
-    openWithToken: async (token) => {
-      await loadModal("steam-link-modal");
-      await this.steamLinkModal?.openWithToken(token);
-    },
-    openForCodeEntry: async () => {
-      await loadModal("steam-link-modal");
-      await this.steamLinkModal?.openForCodeEntry();
-    },
-  };
-  private steamHandoffDeclinedFor: string | null = null;
   private mostRecentJoinEvent: number;
   // A join the player has committed to but that has not reached a lobbyHandle
   // yet. `lobbyHandle` alone does not cover this: a public-lobby join awaits
@@ -721,15 +694,6 @@ class Client {
       console.warn("Rewards modal element not found");
     }
 
-    this.steamLinkModal = document.querySelector(
-      "steam-link-modal",
-    ) as SteamLinkModal;
-    if (!this.steamLinkModal) {
-      console.warn("Steam link modal element not found");
-    }
-
-    this.steamHandoffModal = document.querySelector("steam-handoff-modal");
-
     // The XP of games the player died in, still waiting to be scored, shown
     // provisionally on their level until they are. Listening before the
     // first userMeResponse below.
@@ -740,11 +704,7 @@ class Client {
     });
 
     const onUserMe = async (userMeResponse: UserMeResponse | false) => {
-      if (gamePortal.isOnGamePortal()) {
-        void updatePortalNavButton();
-      } else {
-        updateAccountNavButton(userMeResponse);
-      }
+      updateAccountNavButton(userMeResponse);
       // Before the dispatch: <username-input> reads this store when it picks
       // the lapse notice's wording, and the record has to be current by then.
       const grantStoreBefore = parseSteamGrantStore(
@@ -788,29 +748,9 @@ class Client {
             "Sharing this ID will allow others to view your game history and stats.",
         );
 
-        // Resume a Steam-link flow that was interrupted by a login redirect
-        // (Discord/Google OAuth, magic link): the modal stashed either a
-        // token or a bare code-entry intent and sent the player to log in
-        // via #modal=account, so a login redirect commonly lands back there
-        // rather than on a clean "/" — this must NOT be gated on
-        // cleanHomepage below. Only resume once login is confirmed:
-        // resumePendingSteamLink() consumes the stash on read, so a
-        // speculative call while logged out would burn an entry that a
-        // *later* successful login should still get to resume.
-        //
-        // The response is passed in rather than the check being made here:
-        // the enclosing `userMeResponse !== false` is NOT that confirmation,
-        // because a guest account satisfies it (POST /auth/refresh mints one
-        // for any visitor). resumePendingSteamLink owns the real predicate,
-        // next to the consumption it protects — see its comment.
-        if (resumePendingSteamLink(userMeResponse, this.steamLink)) {
-          return;
-        }
-
-        // Resume a creator-code binding flow interrupted by the same kind of
-        // login redirect (see CreatorCode.ts's stash comment) -- also not
-        // gated on cleanHomepage below, for the same reason as steam-link
-        // above: the /c/CODE deep link's stash routinely lands back on
+        // Resume a creator-code binding flow interrupted by a login redirect
+        // (see CreatorCode.ts's stash comment) -- not gated on cleanHomepage
+        // below: the /c/CODE deep link's stash routinely lands back on
         // #modal=account (or wherever the login round-trip returns to)
         // rather than a clean "/".
         if (
@@ -843,11 +783,6 @@ class Client {
         const claimStore = parseClaimPromptStore(
           localStorage.getItem(CLAIM_PROMPT_KEY),
         );
-        const steamNotice = steamNoticeDue(
-          userMeResponse,
-          isDesktopShell(),
-          Date.now(),
-        );
         await runBootInterrupt(
           nextBootInterrupt({
             cleanHomepage,
@@ -866,8 +801,6 @@ class Client {
               Date.now(),
             ),
             grantStringsReady: steamGrantStringsReady(translateText),
-            steamNotice,
-            steamNoticeStringsReady: steamNoticeStringsReady(translateText),
             // Held rewards can't be claimed yet: on their own they'd open the
             // popup every boot with nothing to do.
             rewardCount: rewards.filter(isRewardClaimable).length,
@@ -878,7 +811,6 @@ class Client {
             claimStore,
             grantStore: grantStoreAfterDispatch,
             publicId,
-            steamNotice,
           },
           {
             translate: translateText,
@@ -1213,8 +1145,6 @@ class Client {
       "account-button",
       "leaderboard-button",
       "token-login",
-      "steam-link-modal",
-      "steam-handoff-modal",
       "matchmaking-modal",
       "clan-modal",
       "account-settings-modal",
@@ -1399,32 +1329,6 @@ class Client {
       return;
     }
 
-    // The desktop Electron shell's account-linking gate opens the browser
-    // here (see SteamLink.ts for the full handoff). Checked against the raw
-    // hash, not decodedHash — parseSteamLinkToken's prefix match is exact
-    // and the token itself is opaque, so no decoding is needed or expected.
-    const steamLinkToken = parseSteamLinkToken(hash);
-    if (steamLinkToken) {
-      // Only the token form: the desktop gate opened it in this browser, so
-      // the Steam build is on this machine. A typed code can come from a phone.
-      this.userSettings.markSteamBuildSeen();
-      strip();
-      void this.steamLink.openWithToken(steamLinkToken);
-      return;
-    }
-
-    // Fallback: the gate's browser handoff itself can fail (wrong default
-    // browser, an odd Linux setup, Steam's overlay browser), in which case it
-    // shows an 8-character code instead and tells the player to enter it on
-    // the website. There's no token in that case, so parseSteamLinkToken
-    // above returns null — this is the bare `#steam-link` hash the code path
-    // lands on instead (see SteamLink.ts's isSteamLinkHash).
-    if (isSteamLinkHash(hash)) {
-      strip();
-      void this.steamLink.openForCodeEntry();
-      return;
-    }
-
     // On a versioned replay shell the pathname IS the game id: the worker
     // serves the record's matching build at replay.<domain>/<gameId> (see
     // VersionedReplay.ts).
@@ -1448,26 +1352,6 @@ class Client {
     const lobbyId =
       pathMatch && GAME_ID_REGEX.test(pathMatch[1]) ? pathMatch[1] : null;
     if (lobbyId) {
-      const handoff =
-        this.steamHandoffDeclinedFor === lobbyId
-          ? "none"
-          : steamHandoffMode(this.userSettings, window.location.search);
-      if (handoff !== "none" && this.steamHandoffModal !== null) {
-        const modal = this.steamHandoffModal;
-        const decline = () => {
-          this.steamHandoffDeclinedFor = lobbyId;
-          void this.handleUrl();
-        };
-        loadModal("steam-handoff-modal").then(
-          () => modal.offer(lobbyId, handoff, decline),
-          (err) => {
-            // Join in the browser rather than leave the link doing nothing.
-            console.error("steam-handoff-modal failed to load:", err);
-            decline();
-          },
-        );
-        return;
-      }
       // Joining needs the API's server list (multi-server v2): the id's
       // letter names the game's server there. No version check: joining an
       // existing game is not starting something new, and the id's letter
@@ -2224,9 +2108,6 @@ const bootstrap = () => {
     document.documentElement.classList.add("game-portal");
   }
 
-  // Populate the portal account buttons once the nav/top-bar have rendered
-  // (onUserMe also refreshes them after auth and on mid-session sign-in).
-  setTimeout(() => void updatePortalNavButton(), 500);
 };
 
 if (document.readyState === "loading") {

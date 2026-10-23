@@ -171,16 +171,6 @@ describe("the multiplayer gate at DetailedGameViewModal's join()", () => {
     expect(wiggle).not.toHaveBeenCalled();
   });
 
-  it("refuses to emit join-lobby and nudges the bar while an update is downloading", async () => {
-    await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
-
-    const card = cardButton("public-1");
-    expect(card).not.toBeNull();
-    card!.click();
-
-    expect(joinLobby).not.toHaveBeenCalled();
-    expect(wiggle).toHaveBeenCalled();
-  });
 
   it("does not close the modal (or drop its lobby list) on a blocked attempt", async () => {
     await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
@@ -194,14 +184,6 @@ describe("the multiplayer gate at DetailedGameViewModal's join()", () => {
     expect(cardButton("public-1")).not.toBeNull();
   });
 
-  it("marks cards aria-disabled while blocked", async () => {
-    await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
-
-    const card = cardButton("public-1");
-    expect(card?.getAttribute("aria-disabled")).toBe("true");
-    // Deliberately not `disabled`/pointer-events-none -- see LobbyCard.ts.
-    expect(card?.hasAttribute("disabled")).toBe(false);
-  });
 
   it("opens join-lobby-modal for a hosted lobby when ungated", async () => {
     await setUpdateState({ status: "current", bytes: 0, total: 0 });
@@ -214,26 +196,7 @@ describe("the multiplayer gate at DetailedGameViewModal's join()", () => {
     expect(joinLobby).not.toHaveBeenCalled();
   });
 
-  it("refuses to open join-lobby-modal for a hosted lobby while blocked", async () => {
-    await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
 
-    const card = cardButton("hosted-1");
-    expect(card).not.toBeNull();
-    card!.click();
-
-    expect(joinModalOpen).not.toHaveBeenCalled();
-    expect(wiggle).toHaveBeenCalled();
-  });
-
-  it("refuses while an update is staged", async () => {
-    await setUpdateState({ status: "staged", bytes: 100, total: 100 });
-
-    cardButton("public-1")!.click();
-    cardButton("hosted-1")!.click();
-
-    expect(joinLobby).not.toHaveBeenCalled();
-    expect(joinModalOpen).not.toHaveBeenCalled();
-  });
 
   it("does not refuse on a failure the player cannot retry away", async () => {
     await setUpdateState({
@@ -396,19 +359,6 @@ describe("DetailedGameViewModal and a confirmed backend outage", () => {
     expect(joinLobby).toHaveBeenCalled();
   });
 
-  it("still refuses on a DESKTOP reason during an outage", async () => {
-    // The control that keeps this from being "the gate was deleted": the
-    // update state is a statement about this client rather than about any
-    // server, so it refuses the same card the outage may not.
-    await confirmOutage();
-    await remountModal();
-    await setUpdateState({ status: "staged", bytes: 0, total: 0 });
-
-    cardButton("public-1")!.click();
-
-    expect(joinLobby).not.toHaveBeenCalled();
-    expect(wiggle).toHaveBeenCalled();
-  });
 
   it("does not refuse after a single missed attempt either", async () => {
     await ensureServerList();

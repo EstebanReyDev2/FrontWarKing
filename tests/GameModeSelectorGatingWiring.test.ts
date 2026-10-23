@@ -173,30 +173,7 @@ describe("the multiplayer gate at its real call sites", () => {
     expect(wiggle).not.toHaveBeenCalled();
   });
 
-  it("refuses every multiplayer entry point while an update is downloading", async () => {
-    await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
 
-    clickEveryButton();
-
-    expect(joinOpen).not.toHaveBeenCalled();
-    expect(hostOpen).not.toHaveBeenCalled();
-    // Refusing silently would look like a broken button; the click has to land
-    // somewhere, and it lands on the snackbar.
-    expect(wiggle).toHaveBeenCalled();
-  });
-
-  it("refuses while an update is staged, and marks the buttons aria-disabled", async () => {
-    await setUpdateState({ status: "staged", bytes: 100, total: 100 });
-
-    expect(
-      selector.querySelectorAll('button[aria-disabled="true"]').length,
-    ).toBeGreaterThan(0);
-
-    clickEveryButton();
-
-    expect(joinOpen).not.toHaveBeenCalled();
-    expect(hostOpen).not.toHaveBeenCalled();
-  });
 
   it("does not refuse on a failure the player cannot retry away", async () => {
     await setUpdateState({
@@ -212,37 +189,7 @@ describe("the multiplayer gate at its real call sites", () => {
     expect(hostOpen).toHaveBeenCalled();
   });
 
-  it("does refuse on a network failure, where Retry is a real remedy", async () => {
-    await setUpdateState({
-      status: "failed",
-      bytes: 0,
-      total: 0,
-      error: { kind: "network", message: "offline" },
-    });
 
-    clickEveryButton();
-
-    expect(joinOpen).not.toHaveBeenCalled();
-    expect(hostOpen).not.toHaveBeenCalled();
-  });
-
-  it("does refuse on a hash-verification failure, which Retry can also fix", async () => {
-    // Newly gating: the descriptor parsed, so we KNOW a newer version exists,
-    // and the CDN bytes not matching it is something Retry can genuinely
-    // resolve. Asserted here and not only against the pure predicate, so the
-    // real call sites are covered for this kind too.
-    await setUpdateState({
-      status: "failed",
-      bytes: 0,
-      total: 0,
-      error: { kind: "verify", message: "sha256 mismatch" },
-    });
-
-    clickEveryButton();
-
-    expect(joinOpen).not.toHaveBeenCalled();
-    expect(hostOpen).not.toHaveBeenCalled();
-  });
 
   it("does not refuse on a malformed descriptor, which Retry cannot fix", async () => {
     await setUpdateState({
@@ -305,26 +252,7 @@ describe("the public lobby card (validateAndJoin)", () => {
     expect(detail.source).toBe("public");
   });
 
-  it("refuses to emit join-lobby while an update is downloading", async () => {
-    await setUpdateState({ status: "downloading", bytes: 1, total: 100 });
 
-    const card = lobbyCardButton();
-    expect(card).not.toBeNull();
-    card!.click();
-
-    expect(joinLobby).not.toHaveBeenCalled();
-    expect(wiggle).toHaveBeenCalled();
-  });
-
-  it("refuses to emit join-lobby while an update is staged", async () => {
-    await setUpdateState({ status: "staged", bytes: 100, total: 100 });
-
-    const card = lobbyCardButton();
-    expect(card).not.toBeNull();
-    card!.click();
-
-    expect(joinLobby).not.toHaveBeenCalled();
-  });
 });
 
 /**

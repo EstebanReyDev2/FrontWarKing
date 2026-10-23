@@ -42,8 +42,6 @@ function boot(
     grantWelcomeDue: false,
     grantEndedDue: false,
     grantStringsReady: true,
-    steamNotice: null,
-    steamNoticeStringsReady: true,
     rewardCount: 0,
     claimPromptDue: true,
     claimStringsReady: true,
@@ -446,7 +444,6 @@ describe("runBootInterrupt", () => {
     claimStore: {},
     grantStore: {},
     publicId: ME,
-    steamNotice: null,
   };
 
   async function run(
@@ -780,8 +777,6 @@ describe("an unready claim prompt yields the boot rather than eating it", () => 
     grantWelcomeDue: false,
     grantEndedDue: false,
     grantStringsReady: false,
-    steamNotice: null,
-    steamNoticeStringsReady: false,
     rewardCount: 2,
     claimPromptDue: true,
     claimStringsReady: claimPromptStringsReady(unready),
@@ -801,7 +796,7 @@ describe("an unready claim prompt yields the boot rather than eating it", () => 
     };
     await runBootInterrupt(
       nextBootInterrupt(inputs),
-      { claimStore: {}, grantStore: {}, publicId: ME, steamNotice: null },
+      { claimStore: {}, grantStore: {}, publicId: ME },
       {
         translate: unready,
         confirm: async (body) => {
@@ -942,7 +937,7 @@ describe("running the Steam grant notices", () => {
     const { base, calls } = ports();
     await runBootInterrupt(
       "grant-welcome",
-      { claimStore: {}, grantStore, publicId: ME, steamNotice: null },
+      { claimStore: {}, grantStore, publicId: ME },
       base,
     );
     expect(calls.alerted).toEqual([
@@ -966,7 +961,7 @@ describe("running the Steam grant notices", () => {
     const { base, calls } = ports();
     await runBootInterrupt(
       "grant-welcome",
-      { claimStore: {}, grantStore, publicId: ME, steamNotice: null },
+      { claimStore: {}, grantStore, publicId: ME },
       base,
     );
     expect(calls.grantStored).toEqual([
@@ -978,7 +973,7 @@ describe("running the Steam grant notices", () => {
     const { base, calls } = ports();
     await runBootInterrupt(
       "grant-ended",
-      { claimStore: {}, grantStore, publicId: ME, steamNotice: null },
+      { claimStore: {}, grantStore, publicId: ME },
       base,
     );
     expect(calls.alerted).toEqual([
@@ -998,7 +993,7 @@ describe("running the Steam grant notices", () => {
     for (const interrupt of ["grant-welcome", "grant-ended"] as const) {
       await runBootInterrupt(
         interrupt,
-        { claimStore: {}, grantStore: {}, publicId: ME, steamNotice: null },
+        { claimStore: {}, grantStore: {}, publicId: ME },
         base,
       );
     }
@@ -1013,7 +1008,7 @@ describe("running the Steam grant notices", () => {
     for (const interrupt of ["grant-welcome", "grant-ended"] as const) {
       await runBootInterrupt(
         interrupt,
-        { claimStore: {}, grantStore, publicId: ME, steamNotice: null },
+        { claimStore: {}, grantStore, publicId: ME },
         base,
       );
     }
@@ -1059,7 +1054,6 @@ describe("an interrupt the player never answered", () => {
     claimStore: {},
     grantStore: { [ME]: grantRecord },
     publicId: ME,
-    steamNotice: null,
   };
 
   function deferred() {

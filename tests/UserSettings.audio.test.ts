@@ -179,11 +179,6 @@ describe("master volume default", () => {
     expect(s.audioVolume("interface")).toBeCloseTo(0.5);
   });
 
-  it("starts the desktop shell audible, at the default master level", () => {
-    pretendDesktopShell();
-    expect(new UserSettings().audioVolume("master")).toBeCloseTo(0.9);
-  });
-
   it("keeps a returning web player audible when only a legacy key is stored", () => {
     // Master has no legacy key, so without this carve-out a player who had
     // deliberately set the old sliders would upgrade into silence.
@@ -342,14 +337,6 @@ describe("resetAudio", () => {
     expect(after.alertsWhenUnfocused()).toBe(true);
   });
 
-  it("returns a desktop player to an audible master", () => {
-    pretendDesktopShell();
-    const s = new UserSettings();
-    s.setAudioVolume("master", 0.2);
-    s.resetAudio();
-    expect(new UserSettings().audioVolume("master")).toBeCloseTo(0.9);
-  });
-
   it("is safe to call twice, and on empty storage", () => {
     const s = new UserSettings();
     expect(() => s.resetAudio()).not.toThrow();
@@ -457,13 +444,6 @@ describe("one-time audio reset", () => {
     expect(new UserSettings().resetAudioOnce()).toBe(true);
     expect(localStorage.getItem("settings.audio.resetVersion")).toBe("1");
     expect(new UserSettings().resetAudioOnce()).toBe(false);
-  });
-
-  it("runs on the desktop shell as well, landing on the desktop default", () => {
-    pretendDesktopShell();
-    localStorage.setItem("settings.audio.master", "1");
-    expect(new UserSettings().resetAudioOnce()).toBe(true);
-    expect(new UserSettings().audioVolume("master")).toBeCloseTo(0.9);
   });
 
   it.each([

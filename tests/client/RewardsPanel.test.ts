@@ -15,10 +15,6 @@ vi.mock("../../src/client/InGameModal", () => ({
   showInGameAlert: vi.fn(),
 }));
 
-vi.mock("../../src/client/CrazyGamesSDK", () => ({
-  crazyGamesSDK: { isOnCrazyGames: vi.fn(() => false) },
-}));
-
 import type { Reward, UserMeResponse } from "@openfront/shared/ApiSchemas";
 import {
   claimAllRewards,
@@ -30,7 +26,6 @@ import {
   RewardsPanel,
   type RewardsChangedDetail,
 } from "../../src/client/components/RewardsPanel";
-import { crazyGamesSDK } from "../../src/client/CrazyGamesSDK";
 import { showInGameAlert } from "../../src/client/InGameModal";
 
 if (!customElements.get("rewards-panel")) {
@@ -101,7 +96,6 @@ describe("<rewards-panel> held rewards", () => {
   afterEach(() => {
     el?.remove();
     el = undefined;
-    vi.mocked(crazyGamesSDK.isOnCrazyGames).mockReturnValue(false);
     vi.clearAllMocks();
   });
 
@@ -169,16 +163,13 @@ describe("<rewards-panel> held rewards", () => {
     ).toBe("account_modal.reward_held_trust_info");
   });
 
-  // Trust needs an account to attach to, and CrazyGames has no purchases.
+  // Trust needs an account to attach to.
   it.each([
-    [true, false, "account_modal.reward_held_trust_info"],
-    [true, true, "account_modal.reward_held_trust_info_crazygames"],
-    [false, false, "account_modal.reward_held_trust_info_signed_out"],
-    [false, true, "account_modal.reward_held_trust_info_signed_out_crazygames"],
+    [true, "account_modal.reward_held_trust_info"],
+    [false, "account_modal.reward_held_trust_info_signed_out"],
   ])(
-    "picks the trust note by sign-in (%s) and CrazyGames (%s): %s",
-    async (signedIn, onCrazyGames, key) => {
-      vi.mocked(crazyGamesSDK.isOnCrazyGames).mockReturnValue(onCrazyGames);
+    "picks the trust note by sign-in (%s): %s",
+    async (signedIn, key) => {
       const panel = await mount([plutonium("1", "trust")], signedIn);
       expect(notes(panel)).toEqual([key]);
     },

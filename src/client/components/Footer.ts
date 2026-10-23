@@ -3,7 +3,6 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { composeVersionDisplay, desktopVersion } from "../DesktopShell";
 import { currentGameVersion } from "../GameVersion";
-import "./SteamWishlistButton";
 
 @customElement("page-footer")
 export class Footer extends LitElement {
@@ -126,17 +125,6 @@ export class Footer extends LitElement {
               class="hover:text-white transition-colors"
             ></a>
           </div>
-        </div>
-
-        <!-- Phones keep the full store widget on the play page instead; there
-             is no room for it here. -->
-        <div
-          class="hidden lg:flex lg:col-start-3 lg:items-center lg:justify-end lg:pt-2 lg:pr-20"
-        >
-          <steam-wishlist-button
-            campaign="home_desktop"
-            class="min-w-0 flex-1 max-w-[544px]"
-          ></steam-wishlist-button>
         </div>
 
         <!-- Single instance: translateText() resolves the active language via

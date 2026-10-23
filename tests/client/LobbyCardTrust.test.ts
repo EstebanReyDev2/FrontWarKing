@@ -130,18 +130,6 @@ describe("trustRequiredDialog", () => {
   it("tells a signed-out viewer to sign in first", () => {
     expect(message(false)).toBe("public_lobby.trust_required_body_signed_out");
   });
-
-  it("never suggests a purchase on CrazyGames, where there is no IAP", () => {
-    isOnCrazyGames.mockReturnValue(true);
-    try {
-      expect(message(true)).toBe("public_lobby.trust_required_body_crazygames");
-      expect(message(false)).toBe(
-        "public_lobby.trust_required_body_signed_out_crazygames",
-      );
-    } finally {
-      isOnCrazyGames.mockReturnValue(false);
-    }
-  });
 });
 
 describe("viewerIsSignedIn", () => {

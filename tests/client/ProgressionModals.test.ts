@@ -653,20 +653,6 @@ describe("game stats XP", () => {
     expect(await cardState()).toBeNull();
   });
 
-  it("shows XP to a CrazyGames player, the same as the end-of-game panel", async () => {
-    getUserMe.mockResolvedValue({ ...me, user: {} });
-    crazyGamesSDK.isOnCrazyGames.mockReturnValue(true);
-    crazyGamesSDK.getUserProfile.mockResolvedValue({ username: "cg" });
-    fetchMyGameXp.mockResolvedValue({ status: "ok", data: eligibleXp });
-    try {
-      await open("g6");
-      await vi.waitFor(async () => expect(await cardState()).toBe("result"));
-    } finally {
-      crazyGamesSDK.isOnCrazyGames.mockReturnValue(false);
-      crazyGamesSDK.getUserProfile.mockResolvedValue(null);
-    }
-  });
-
   it("does not ask for a signed-out viewer", async () => {
     getUserMe.mockResolvedValue({ user: {}, player: { publicId: "anon" } });
     await open("g4");

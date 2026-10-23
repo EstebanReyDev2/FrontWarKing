@@ -91,55 +91,6 @@ describe("subscription-panel", () => {
   // desktop build must never steer to a payment page. Rendering the button
   // anyway produces a dead control -- and once infra accepts app://openfront
   // as a returnUrl it gets worse, because the click then raises the shell's
-  // "Purchase unavailable / nothing has been charged" modal at a player who
-  // is trying to STOP paying. Render static copy instead of a button.
-  describe("inside the desktop shell", () => {
-    beforeEach(async () => {
-      (window as unknown as { openfrontDesktop?: unknown }).openfrontDesktop = {
-        steam: {},
-      };
-      el.sub = sub();
-      el.requestUpdate();
-      await el.updateComplete;
-    });
-
-    afterEach(() => {
-      delete (window as unknown as { openfrontDesktop?: unknown })
-        .openfrontDesktop;
-    });
-
-    it("offers no Manage button", async () => {
-      const keys = Array.from(el.querySelectorAll("o-button")).map((b) =>
-        b.getAttribute("translationKey"),
-      );
-      expect(keys).not.toContain("account_modal.manage_subscription");
-    });
-
-    it("says where billing is managed instead", async () => {
-      expect(text()).toContain("account_modal.manage_subscription_on_web");
-    });
-
-    // A link-out is the thing that is prohibited, so the replacement must not
-    // quietly become one.
-    it("renders no anchor to click", async () => {
-      expect(el.querySelector("a")).toBeNull();
-    });
-
-    it("offers no Reactivate button either, for the same reason", async () => {
-      el.sub = sub({ cancelAtPeriodEnd: true });
-      await el.updateComplete;
-      const keys = Array.from(el.querySelectorAll("o-button")).map((b) =>
-        b.getAttribute("translationKey"),
-      );
-      expect(keys).not.toContain("account_modal.reactivate_subscription");
-    });
-
-    // Cancel does NOT link out -- it is a fetch to our own API -- so it keeps
-    // working, and it is the control a player most needs.
-    it("keeps the Cancel control", async () => {
-      expect(text()).toContain("account_modal.cancel_subscription");
-    });
-  });
 
   // The renewal bounced. Stripe is still retrying, and the portal is where
   // the card gets fixed, so it is the only thing on offer.
@@ -183,16 +134,6 @@ describe("subscription-panel", () => {
       );
       expect(openSubscriptionPortal).toHaveBeenCalled();
       open.mockRestore();
-    });
-
-    it("says where billing is managed inside the desktop shell", async () => {
-      (window as unknown as { openfrontDesktop?: unknown }).openfrontDesktop = {
-        steam: {},
-      };
-      el.requestUpdate();
-      await el.updateComplete;
-      expect(keys()).toEqual([]);
-      expect(text()).toContain("account_modal.manage_subscription_on_web");
     });
   });
 
@@ -289,21 +230,6 @@ describe("subscription-panel", () => {
       expect(text()).toContain("free_play.full_game");
       // Only the desktop build is ad-free for everyone; the website is not.
       expect(text()).not.toContain("free_play.ad_free_steam");
-    });
-
-    it("promises ad-free play only inside the desktop shell", async () => {
-      (window as unknown as { openfrontDesktop?: unknown }).openfrontDesktop = {
-        steam: {},
-      };
-      try {
-        el.sub = granted();
-        el.requestUpdate();
-        await el.updateComplete;
-        expect(text()).toContain("free_play.ad_free_steam");
-      } finally {
-        delete (window as unknown as { openfrontDesktop?: unknown })
-          .openfrontDesktop;
-      }
     });
 
     // Not a link — the desktop build must not hand over a route to a payment

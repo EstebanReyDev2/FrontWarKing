@@ -113,15 +113,13 @@ describe("boot sequencing against a real <username-input>", () => {
       grantWelcomeDue: false,
       grantEndedDue: false,
       grantStringsReady: true,
-      steamNotice: null,
-      steamNoticeStringsReady: true,
       rewardCount: (player.rewards ?? []).length,
       claimPromptDue: true,
       claimStringsReady: true,
     });
     await runBootInterrupt(
       interrupt,
-      { claimStore: {}, grantStore: {}, publicId: "p", steamNotice: null },
+      { claimStore: {}, grantStore: {}, publicId: "p" },
       ports,
     );
     return { interrupt, ...calls };

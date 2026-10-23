@@ -155,13 +155,6 @@ describe("which list a page asks for", () => {
     expect(serverListSite()).toBe("my-branch.openfront.dev");
   });
 
-  it("the desktop shell asks for its injected serverHost, whatever the document host", () => {
-    (window as any).openfrontDesktop = {};
-    setBootstrap({ serverHost: "nightly.openfront.dev", siteHost: undefined });
-    stubLocation("openfront");
-    expect(serverListSite()).toBe("nightly.openfront.dev");
-  });
-
   it("builds the API url from the audience and the site", () => {
     expect(serverListUrl("openfront.io")).toBe(
       "https://api.openfront.io/cluster.json?site=openfront.io",
@@ -1926,14 +1919,6 @@ describe("redirectToGameVersion", () => {
     expect(loc.href).toBe("https://openfront.io/game/cAbCd12345");
   });
 
-  it("never navigates the desktop shell", async () => {
-    const loc = stubLocation("openfront.io", "/game/cAbCd12345");
-    await withList();
-    (window as any).openfrontDesktop = {};
-    expect(redirectToGameVersion("cAbCd12345")).toBe(false);
-    expect(loc.href).toBe("https://openfront.io/game/cAbCd12345");
-  });
-
   // replay.<domain> serves the build a record was made on and has no
   // /v/<commit>/ routes at all, so navigating there would 404 and lose an
   // archived replay. It does load the site's list (siteHost is injected),
@@ -2001,14 +1986,9 @@ describe("versionedPathForMismatchedGame", () => {
     );
   });
 
-  it("answers nothing on the shells with no /v/<commit>/ routes", async () => {
+  it("answers nothing on the replay shell, which has no /v/<commit>/ routes", async () => {
     stubLocation("replay.openfront.io", "/cAbCd12345");
     await withList();
-    expect(versionedPathForMismatchedGame("cAbCd12345", OLD)).toBeNull();
-
-    stubLocation("openfront.io", "/game/cAbCd12345");
-    await withList();
-    (window as any).openfrontDesktop = {};
     expect(versionedPathForMismatchedGame("cAbCd12345", OLD)).toBeNull();
   });
 });

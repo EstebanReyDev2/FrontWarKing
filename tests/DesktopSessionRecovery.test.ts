@@ -47,20 +47,6 @@ describe("desktop session recovery", () => {
     expect(retryServerList).toHaveBeenCalledOnce();
   });
 
-  it("signs back in when the server Retry or heartbeat confirms recovery", () => {
-    unsubscribe = subscribeDesktopSessionRecovery(signIn);
-    reachability(true);
-    expect(signIn).toHaveBeenCalledOnce();
-    expect(retryServerList).not.toHaveBeenCalled();
-  });
-
-  it("retries on the browser online event without waiting for the heartbeat", () => {
-    unsubscribe = subscribeDesktopSessionRecovery(signIn);
-    window.dispatchEvent(new Event("online"));
-    expect(signIn).toHaveBeenCalledOnce();
-    expect(retryServerList).toHaveBeenCalledOnce();
-  });
-
   it("shares one recovery across simultaneous clicks and network events", async () => {
     let finish!: () => void;
     signIn.mockReturnValue(
@@ -154,19 +140,4 @@ describe("desktop session recovery", () => {
     expect(signIn).toHaveBeenCalledOnce();
   });
 
-  // needs-account is deliberately IN the auto-retry set, for the one case
-  // that survives: a player can finish linking on the website while the game
-  // is open, after which an account exists and a retry signs them in. (It was
-  // also transient back when the shell reported an unreachable status
-  // endpoint as needs-account; openfront-desktop#91 fixed that.)
-  it("auto-retries needs-account when reachability recovers", () => {
-    vi.mocked(getDesktopSessionState).mockReturnValue({
-      status: "signed-out",
-      reason: "needs-account",
-    });
-    unsubscribe = subscribeDesktopSessionRecovery(signIn);
-    reachability(false);
-    reachability(true);
-    expect(signIn).toHaveBeenCalledOnce();
-  });
 });

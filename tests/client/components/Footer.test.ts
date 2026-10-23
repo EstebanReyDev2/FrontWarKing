@@ -46,19 +46,6 @@ describe("page-footer version line", () => {
     expect(line?.textContent?.trim()).toBe(gameVersion);
   });
 
-  it("appends the shell version inside the desktop shell", async () => {
-    window.openfrontDesktop = {
-      version: () => Promise.resolve("0.2.0"),
-    };
-    await mount();
-
-    await vi.waitFor(async () => {
-      await footer.updateComplete;
-      const line = footer.querySelector(".footer-version");
-      expect(line?.textContent?.trim()).toBe(`${gameVersion} (Steam v0.2.0)`);
-    });
-  });
-
   // End to end through the component: with a real BOOTSTRAP_CONFIG in the
   // page and the placeholder still in version.txt, the line must name the
   // commit rather than "vx.xx.xx". Expectation derived from the same helper

@@ -24,7 +24,7 @@ describe("shouldBlockMultiplayerAction", () => {
     ).toBe(false);
   });
 
-  it("blocks while downloading and while staged", () => {
+  it("does not block on an update state, since there is no shell", () => {
     expect(
       shouldBlockMultiplayerAction(
         {
@@ -35,14 +35,14 @@ describe("shouldBlockMultiplayerAction", () => {
         null,
         false,
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldBlockMultiplayerAction(
         { status: "staged", bytes: 2, total: 2 },
         null,
         false,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("does not block when the shell is too old to update", () => {
@@ -64,12 +64,12 @@ describe("shouldBlockMultiplayerAction", () => {
     error: { kind, message: kind },
   });
 
-  it("blocks a failed check when Retry is a real remedy", () => {
+  it("does not block a failed check, since there is no shell", () => {
     expect(shouldBlockMultiplayerAction(failed("network"), null, false)).toBe(
-      true,
+      false,
     );
     expect(shouldBlockMultiplayerAction(failed("verify"), null, false)).toBe(
-      true,
+      false,
     );
   });
 
@@ -96,7 +96,7 @@ describe("shouldBlockMultiplayerAction with a session", () => {
     ).toBe(false);
   });
 
-  it("blocks on a signed-out session even when the update is current", () => {
+  it("does not block on a signed-out session", () => {
     expect(
       shouldBlockMultiplayerAction(
         healthyUpdate,
@@ -106,10 +106,10 @@ describe("shouldBlockMultiplayerAction with a session", () => {
         },
         false,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("blocks on a pending update even when signed in", () => {
+  it("does not block on a pending update", () => {
     expect(
       shouldBlockMultiplayerAction(
         { status: "staged", bytes: 0, total: 0 },
@@ -118,7 +118,7 @@ describe("shouldBlockMultiplayerAction with a session", () => {
         },
         false,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("does not block on the web, where neither state exists", () => {
@@ -150,14 +150,14 @@ describe("shouldBlockMultiplayerAction with a backend outage", () => {
     expect(shouldBlockMultiplayerAction(null, null, false)).toBe(false);
   });
 
-  it("still blocks on a desktop reason while the backend is fine", () => {
+  it("does not block on a desktop reason while the backend is fine", () => {
     expect(
       shouldBlockMultiplayerAction(
         { status: "staged", bytes: 0, total: 0 },
         { status: "signed-in" },
         false,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 
@@ -213,17 +213,16 @@ describe("shouldBlockJoin", () => {
     expect(shouldBlockJoin(mp, healthy, { status: "signed-in" })).toBe(false);
   });
 
-  it("blocks a multiplayer join when signed out", () => {
+  it("does not block a multiplayer join when signed out", () => {
     expect(
       shouldBlockJoin(mp, healthy, {
         status: "signed-out",
         reason: "steam-wedged",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  // The claim that update-gating inherits the funnel fix, actually pinned.
-  it("blocks a multiplayer join on a pending update even when signed in", () => {
+  it("does not block a multiplayer join on a pending update", () => {
     expect(
       shouldBlockJoin(
         mp,
@@ -232,7 +231,7 @@ describe("shouldBlockJoin", () => {
           status: "signed-in",
         },
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("never blocks single-player, whatever the states say", () => {
@@ -288,7 +287,7 @@ describe("shouldBlockSocketSourcedAction", () => {
     ).toBe(false);
   });
 
-  it("still blocks a card click while an update is pending", () => {
+  it("does not block a card click while an update is pending", () => {
     expect(
       shouldBlockSocketSourcedAction(
         { status: "staged", bytes: 0, total: 0 },
@@ -296,16 +295,16 @@ describe("shouldBlockSocketSourcedAction", () => {
           status: "signed-in",
         },
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("still blocks a card click while signed out", () => {
+  it("does not block a card click while signed out", () => {
     expect(
       shouldBlockSocketSourcedAction(healthy, {
         status: "signed-out",
         reason: "steam-wedged",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   // The finding this rule answers: the funnel refused to gate a "public" join

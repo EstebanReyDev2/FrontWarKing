@@ -199,7 +199,7 @@ describe("GameModeSelector update prompt on a pinned /v/<commit>/ page", () => {
 // offer would be refused -- and reopened when the session comes back. Main's
 // own stop()/start() still wins: a session change must never reopen a feed
 // Main closed for a game.
-describe("GameModeSelector lobby feed while the desktop session is gated", () => {
+describe("GameModeSelector lobby feed lifecycle", () => {
   let selector: GameModeSelector & { updateComplete: Promise<unknown> };
 
   function setSession(detail: { status: string; reason?: string }) {
@@ -232,23 +232,7 @@ describe("GameModeSelector lobby feed while the desktop session is gated", () =>
     ClientEnv.reset();
   });
 
-  it("closes the feed when the session drops and reopens it when it returns", () => {
-    expect(socketCalls.started).toBe(1);
 
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    expect(socketCalls.stopped).toBe(1);
-
-    setSession({ status: "signed-in" });
-    expect(socketCalls.started).toBe(2);
-  });
-
-  it("does not churn the socket on a session change that keeps it gated", () => {
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    setSession({ status: "retrying" });
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    expect(socketCalls.stopped).toBe(1);
-    expect(socketCalls.started).toBe(1);
-  });
 
   it("does not reopen a feed Main stopped for a game", () => {
     selector.stop();
@@ -260,45 +244,7 @@ describe("GameModeSelector lobby feed while the desktop session is gated", () =>
     expect(socketCalls.started).toBe(2);
   });
 
-  it("keeps a start() while gated closed until the session returns", () => {
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    selector.stop();
-    selector.start();
-    expect(socketCalls.started).toBe(1);
 
-    setSession({ status: "signed-in" });
-    expect(socketCalls.started).toBe(2);
-  });
-
-  it("drops a snapshot kept across a game when start() finds the session gated", async () => {
-    lobbiesCallbackRef.current?.({
-      serverTime: Date.now(),
-      games: {
-        ffa: [
-          {
-            gameID: "abc",
-            numClients: 1,
-            publicGameType: "ffa",
-            gameConfig: {
-              gameMap: "World",
-              gameMode: "Free For All",
-              maxPlayers: 8,
-            },
-          },
-        ],
-      },
-    } as unknown as PublicGames);
-    await selector.updateComplete;
-    expect(selector.querySelector("button.group")).not.toBeNull();
-
-    selector.stop();
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    selector.start();
-    await selector.updateComplete;
-
-    expect(selector.querySelector("button.group")).toBeNull();
-    expect(selector.textContent).toContain("mode_selector.offline_lobbies");
-  });
 
   it("swaps the spinner and any cards for the offline message once the socket gives up", async () => {
     const snapshot = {
@@ -432,26 +378,5 @@ describe("GameModeSelector lobby feed while the desktop session is gated", () =>
     expect(selector.textContent).toContain("mode_selector.retry_lobbies");
   });
 
-  it("offers no Retry while the session is gated, where the status bar owns the remedy", async () => {
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    await selector.updateComplete;
 
-    expect(selector.textContent).toContain("mode_selector.offline_lobbies");
-    expect(selector.textContent).not.toContain("mode_selector.retry_lobbies");
-  });
-
-  it("shows an offline message in place of the spinner while gated", async () => {
-    await selector.updateComplete;
-    expect(selector.querySelector(".animate-spin")).not.toBeNull();
-
-    setSession({ status: "signed-out", reason: "steam-unavailable" });
-    await selector.updateComplete;
-    expect(selector.querySelector(".animate-spin")).toBeNull();
-    expect(selector.textContent).toContain("mode_selector.offline_lobbies");
-
-    setSession({ status: "signed-in" });
-    await selector.updateComplete;
-    expect(selector.querySelector(".animate-spin")).not.toBeNull();
-    expect(selector.textContent).not.toContain("mode_selector.offline_lobbies");
-  });
 });

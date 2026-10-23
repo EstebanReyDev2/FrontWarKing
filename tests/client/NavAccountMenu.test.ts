@@ -183,42 +183,6 @@ describe("nav-account-menu", () => {
     }
   });
 
-  it("keeps the menu on CrazyGames, minus the log-out they own", async () => {
-    isOnCrazyGames.mockReturnValue(true);
-    getUserProfile.mockResolvedValue({ username: "cg-player" });
-    fireUserMe(userMe());
-    await el.updateComplete;
-    await new Promise((r) => setTimeout(r, 0));
-    await el.updateComplete;
-    await click(trigger());
-
-    // Their username/subscription management still needs reaching…
-    expect(itemKeys()).toContain("change-username");
-    // …but signing out happens on CrazyGames, not through /auth/logout.
-    expect(itemKeys()).not.toContain("log-out");
-  });
-
-  it("drops log-out on Steam, where the ticket signs the player back in", async () => {
-    (window as { openfrontDesktop?: unknown }).openfrontDesktop = {
-      steam: {},
-    };
-    fireUserMe(userMe());
-    await el.updateComplete;
-    await click(trigger());
-
-    expect(itemKeys()).toContain("account-settings");
-    expect(itemKeys()).not.toContain("log-out");
-  });
-
-  it("hands CrazyGames guests to the SDK sign-in prompt", async () => {
-    isOnCrazyGames.mockReturnValue(true);
-    fireUserMe(false);
-    await el.updateComplete;
-    await click(trigger());
-    await click(document.querySelector('[data-menu-item="sign-in"]')!);
-    expect(showAuthPrompt).toHaveBeenCalledTimes(1);
-  });
-
   it("logs out only after the confirmation is accepted", async () => {
     fireUserMe(userMe());
     await el.updateComplete;

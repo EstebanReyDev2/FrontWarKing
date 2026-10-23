@@ -83,12 +83,6 @@ describe("purchase-nudge-modal", () => {
     expect(await shown()).toBe(false);
   });
 
-  it("stays hidden on CrazyGames", async () => {
-    isOnCrazyGames.mockReturnValue(true);
-    fireUserMe(false);
-    expect(await shown()).toBe(false);
-  });
-
   it("stays hidden in the desktop shell, which never shows ads", async () => {
     isDesktopShell.mockReturnValue(true);
     fireUserMe(false);

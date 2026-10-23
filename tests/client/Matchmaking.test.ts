@@ -716,18 +716,6 @@ describe("MatchmakingModal opens the match at its server's version", () => {
     expect(joined).toHaveBeenCalledOnce();
     expect(loc.href).toBe("https://openfront.io/");
   });
-
-  it("never navigates the desktop shell, which owns its own version", async () => {
-    envMocks.gameVersion.mockReturnValue(OLD);
-    const loc = stubLocation("openfront.io");
-    (window as unknown as { openfrontDesktop?: unknown }).openfrontDesktop = {};
-
-    const { joined } = await matchAndCheck();
-
-    expect(joined).toHaveBeenCalledOnce();
-    expect(loc.href).toBe("https://openfront.io/");
-  });
-
   // replay.<domain> has no /v/<commit>/ routes, so that would 404.
   it("never navigates a replay shell", async () => {
     envMocks.gameVersion.mockReturnValue(OLD);
