@@ -12,7 +12,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
 | 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
-| 4 · Progresión comercial y cosméticos | Pendiente | — |
+| 4 · Progresión comercial y cosméticos | En curso | — |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
 | 6 · Recorte de `Api.ts` | Pendiente | — |
 
@@ -59,6 +59,105 @@ mensaje de `fb7d7e0a1` y en el reporte del grupo.
 dependencia de pago y sólo la importaban `StripeInline.ts` e `InlineCheckout.ts`.
 `resources/lang/en.json` perdió 111 claves huérfanas.
 
+
+## Borrado obligatorio antes de cerrar la Fase 1
+
+Esta es la lista de supervivientes del Grupo 4 y de los restos del Grupo 3. La
+Fase 1 **no se cierra** hasta que quede vacía. Cada ítem indica el subgrupo que
+lo elimina; al borrarlo se marca la casilla y se tacha el nombre.
+
+### 4a · Progresión en partida, badges de nivel y cuenta
+
+- [ ] `src/client/components/GameXpPanel.ts` — 4a-1
+- [ ] `src/client/ProvisionalXp.ts` — 4a-1
+- [ ] `src/client/ProvisionalXpAtDeath.ts` — 4a-1
+- [ ] `src/client/XpMultipliers.ts` — 4a-1
+- [ ] `src/client/components/LegendCeremony.ts` — 4a-1
+- [ ] `src/client/MomentShare.ts` — 4a-1
+- [ ] `src/client/components/PrestigeFlow.ts` — 4a-1
+- [ ] `src/client/components/FlareCosmetic.ts` — 4a-1
+- [ ] `src/client/hud/layers/WinModal.ts` — quitar sólo las secciones de XP, Legend, hitos y promo de cosméticos — 4a-1
+- [ ] `src/client/components/LevelBadge.ts` — 4a-2
+- [ ] `src/client/components/LevelBadgeFill.ts` — 4a-2
+- [ ] `src/client/components/LevelBadgeIcons.ts` — 4a-2
+- [ ] `src/client/components/LevelBadgeLargeIcons.ts` — 4a-2
+- [ ] `src/client/components/LevelBadgeSlot.ts` — 4a-2
+- [ ] `src/client/OwnLevelBadge.ts` — 4a-2
+- [ ] `src/client/LobbyRosterLevels.ts` — 4a-2
+- [ ] `src/client/ClientGameRunner.ts` — quitar `rememberLobbyRoster` y el wiring de badges — 4a-2
+- [ ] `src/client/hud/layers/PlayerPanel.ts` — quitar el badge de nivel — 4a-2
+- [ ] `src/client/components/ProfileCard.ts` — 4a-3
+- [ ] `src/client/components/ProfileProgression.ts` — 4a-3
+- [ ] `src/client/PlayerProgress.ts` — 4a-3
+- [ ] `src/client/ProvisionalProgress.ts` — 4a-3
+- [ ] `src/client/Progression.ts` — 4a-3
+- [ ] `src/client/ProgressionAccount.ts` — 4a-3
+- [ ] `src/client/ProgressionApi.ts` — 4a-3
+- [ ] `src/client/components/ProgressionSection.ts` — 4a-3
+- [ ] `src/client/components/RewardTrack.ts` — 4a-3
+- [ ] `src/client/components/RewardsPanel.ts` — 4a-3
+- [ ] `src/client/RewardsModal.ts` — 4a-3
+- [ ] `src/client/RewardClaims.ts` — 4a-3
+- [ ] `src/client/GameRewards.ts` — 4a-3
+- [ ] `src/client/components/XpBar.ts` — 4a-3
+- [ ] `src/client/components/PastGameXpCard.ts` — 4a-3
+- [ ] `src/client/Main.ts` — quitar rewards modal, arranque de progresión, boot interrupt y ruta de inventario — 4a-3
+- [ ] `src/client/AccountModal.ts` — quitar tab de progresión — 4a-3
+- [ ] `src/client/PlayerProfileModal.ts` — quitar nivel y progresión — 4a-3
+- [ ] `src/client/GameStatsModal.ts` — quitar XP y progresión — 4a-3
+- [ ] `src/client/components/NavAccountMenu.ts` — quitar nivel y badge — 4a-3
+- [ ] `src/client/components/AccountSettingsPanel.ts` — quitar settings de progresión/cosméticos — 4a-3
+- [ ] `src/client/Api.ts` — quitar endpoints de nivel/progresión/rewards — 4a-3
+
+### 4b · Inventario, tienda cosmética y fondo de la home
+
+- [ ] `src/client/InventoryModal.ts` — 4b
+- [ ] `src/client/components/InventoryLoadoutBar.ts` — 4b
+- [ ] `src/client/components/InventoryLoadoutMenu.ts` — 4b
+- [ ] `src/client/components/EquippedCosmeticsRow.ts` — 4b
+- [ ] `src/client/EquippedCosmetics.ts` — 4b
+- [ ] `src/client/components/CosmeticBackground.ts` — 4b
+- [ ] `src/client/components/CosmeticCard.ts` — 4b
+- [ ] `src/client/components/CosmeticInfo.ts` — 4b
+- [ ] `src/client/components/CosmeticPresentation.ts` — 4b
+- [ ] `src/client/components/CosmeticPreview.ts` — 4b
+- [ ] `src/client/components/CosmeticPreviewBubble.ts` — 4b
+- [ ] `src/client/components/CosmeticPreviewModal.ts` — 4b
+- [ ] `src/client/components/cosmetics/CosmeticRenderCanvas.ts` — 4b
+- [ ] `src/client/render/preview/CosmeticPreviewRenderer.ts` — 4b
+- [ ] `src/client/Cosmetics.ts` — reducir a la ruta de display; quitar compra, tienda, resolución y helpers muertos — 4b
+- [ ] `src/client/UserSettings.ts` — quitar loadouts y settings de inventario — 4b
+- [ ] `src/client/Api.ts` — quitar compra de cosméticos y listados de tienda — 4b
+- [ ] `index.html` — quitar `<inventory-modal>` — 4b
+- [ ] `src/client/Main.ts` — quitar ruta/nav de inventario y `LazyModals` — 4b
+- [ ] `src/client/components/LangSelector.ts` — quitar tags de inventario/cosméticos — 4b
+- [ ] `src/client/PlayPage.ts` — quitar el fondo cosmético de la home — 4b
+- [ ] Productores de `#modal=store` (`InventoryModal`, `EquippedCosmetics`) — 4b
+
+### 4c · Restos de pagos y Steam
+
+- [ ] `src/client/Payments.ts` — 4c
+- [ ] `src/client/SubscriptionPolicy.ts` — 4c
+- [ ] `src/client/SteamGrantNotices.ts` — 4c
+- [ ] `translateCosmetic` en `src/client/Cosmetics.ts` — 4c
+- [ ] `main.store` — 4c
+- [ ] Verificar que no quede ningún productor de `#modal=store` — 4c
+
+### Restos del Grupo 3 que no son de este grupo
+
+- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5
+- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5
+
+## Deuda para Fase 2
+
+El catálogo de cosméticos todavía depende del servidor original. `fetchCosmetics`,
+`getPlayerCosmeticsRefs` y `cosmeticsJsonUrl` en `src/client/Cosmetics.ts`, más
+el join que arma `PlayerCosmetics` para el servidor, asumen un backend que
+sirve `cosmetics.json` y resuelve el inventario del jugador. Al reemplazar ese
+backend por Supabase hay que decidir de dónde sale el catálogo (tabla, storage
+o archivo estático) y si el join de `PlayerCosmetics` se conserva o se elimina.
+No es deuda de la Fase 1: el render de cosméticos sigue funcionando con el
+contrato actual.
 
 ## Contratos del engine y del netcode
 
