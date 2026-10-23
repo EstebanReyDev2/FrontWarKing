@@ -1,8 +1,5 @@
 import { GAME_ID_REGEX } from "@openfront/engine-api/Schemas";
-import {
-  isRewardClaimable,
-  UserMeResponse,
-} from "@openfront/shared/ApiSchemas";
+import { UserMeResponse } from "@openfront/shared/ApiSchemas";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { GameEnv } from "@openfront/shared/configuration/Env";
 import { EventBus } from "@openfront/shared/EventBus";
@@ -17,7 +14,6 @@ import {
 } from "@openfront/shared/WireSchemas";
 import { ClientEnv } from "src/client/ClientEnv";
 import { renderNavVersion } from "src/client/GameVersion";
-import { responseHasLinkedIdentity } from "./AccountIdentity";
 import { getUserMe, invalidateUserMe, markNoticeSeen } from "./Api";
 import {
   getDesktopSessionState,
@@ -38,11 +34,7 @@ import {
   steamGrantStringsReady,
 } from "./BootInterrupts";
 import type { JoinLobbyResult } from "./ClientGameRunner";
-import {
-  broadcastFreshUserMe,
-  getPlayerCosmeticsRefs,
-  translateCosmetic,
-} from "./Cosmetics";
+import { getPlayerCosmeticsRefs, translateCosmetic } from "./Cosmetics";
 import { desktopPresence, type PresencePayload } from "./DesktopPresence";
 import { subscribeDesktopSessionRecovery } from "./DesktopSessionRecovery";
 import {
@@ -86,9 +78,6 @@ import {
   presenceLobbyId,
   withGroupToken,
 } from "./PresenceGroup";
-import { fetchMyGameXp, fetchProgressionConfig } from "./ProgressionApi";
-import { startProvisionalProgress } from "./ProvisionalProgress";
-import type { RewardsModal } from "./RewardsModal";
 import {
   ensureServerList,
   redirectToGameVersion,
@@ -281,7 +270,6 @@ class Client {
   private userSettings: UserSettings = new UserSettings();
   private tokenLoginModal: TokenLoginModal;
   private matchmakingModal: MatchmakingModal;
-  private rewardsModal: RewardsModal;
   private mostRecentJoinEvent: number;
   // A join the player has committed to but that has not reached a lobbyHandle
   // yet. `lobbyHandle` alone does not cover this: a public-lobby join awaits
@@ -383,8 +371,8 @@ class Client {
     // auth-gated call below, and both share the one in-flight promise — so its
     // .then runs first, announceLapse writes the marker and opens its alert,
     // and by the time onUserMe looks the answer is always "already shown". The
-    // rewards popup would then stack on top of the lapse alert, which is the
-    // exact collision the sequencer exists to prevent.
+    // snapshot keeps the sequencer reading the marker as it was at boot, not
+    // after another part of the page has already spoken.
     //
     // Re-taken by snapshotLapseMarker() at the top of every path that can
     // re-run onUserMe, again before that path's own await.
@@ -651,20 +639,6 @@ class Client {
       console.warn("Matchmaking modal element not found");
     }
 
-    this.rewardsModal = document.querySelector("rewards-modal") as RewardsModal;
-    if (!this.rewardsModal) {
-      console.warn("Rewards modal element not found");
-    }
-
-    // The XP of games the player died in, still waiting to be scored, shown
-    // provisionally on their level until they are. Listening before the
-    // first userMeResponse below.
-    startProvisionalProgress({
-      fetchXp: (gameId) => fetchMyGameXp(gameId),
-      loadConfig: fetchProgressionConfig,
-      refreshUserMe: broadcastFreshUserMe,
-    });
-
     const onUserMe = async (userMeResponse: UserMeResponse | false) => {
       updateAccountNavButton(userMeResponse);
       // Before the dispatch: <username-input> reads this store when it picks
@@ -728,7 +702,6 @@ class Client {
         // not by which branch happens to be written first here.
         const { usernameStatus, username, usernameBase, publicId } =
           userMeResponse.player;
-        const rewards = userMeResponse.player.rewards ?? [];
         const claimStore = parseClaimPromptStore(
           localStorage.getItem(CLAIM_PROMPT_KEY),
         );
@@ -750,9 +723,6 @@ class Client {
               Date.now(),
             ),
             grantStringsReady: steamGrantStringsReady(translateText),
-            // Held rewards can't be claimed yet: on their own they'd open the
-            // popup every boot with nothing to do.
-            rewardCount: rewards.filter(isRewardClaimable).length,
             claimPromptDue: claimPromptDue(claimStore, Date.now(), publicId),
             claimStringsReady: claimPromptStringsReady(translateText),
           }),
@@ -777,19 +747,6 @@ class Client {
             tierName: (tier) => translateCosmetic("subscriptions", tier),
             navigate: (hash) => {
               window.location.hash = hash;
-            },
-            openRewards: () => {
-              // Signed in as for trustRequiredDialog: a linked identity, or a
-              // portal sign-in (only the SDK knows that one).
-              void (async () => {
-                const signedIn =
-                  responseHasLinkedIdentity(userMeResponse) ||
-                  (gamePortal.isOnGamePortal() &&
-                    (await gamePortal.getUserProfile()) !== null);
-                whenModalLoaded("rewards-modal", () =>
-                  this.rewardsModal?.openWithRewards(rewards, signedIn),
-                );
-              })();
             },
             storeClaimPrompt: (store) =>
               localStorage.setItem(CLAIM_PROMPT_KEY, JSON.stringify(store)),

@@ -1,13 +1,14 @@
 // What, if anything, interrupts the player on a clean boot — decided in one
 // place, as data.
 //
-// Four things independently wanted the main menu the moment /users/@me landed:
-// the TEMPORARY#### rename prompt, the unclaimed-name prompt this module adds,
-// the reservation lapse notice, and the unclaimed-rewards popup. Main.ts
-// resolved the first two against each other with a bare `return` and the third
-// did not participate at all — it fires from inside <username-input>, on its
-// own listener, and neither side could see the other. Two overlays on one boot
-// was a matter of which states happened not to co-occur.
+// Several things independently wanted the main menu the moment /users/@me
+// landed: the TEMPORARY#### rename prompt, the unclaimed-name prompt this
+// module adds, the reservation lapse notice, and the Steam grant notices.
+// Main.ts resolved the first two against each other with a bare `return` and
+// the lapse notice did not participate at all — it fires from inside
+// <username-input>, on its own listener, and neither side could see the other.
+// Two overlays on one boot was a matter of which states happened not to
+// co-occur.
 //
 // So: one ordered rule, expressed over plain values. Main.ts asks once and acts
 // on the answer, which makes the ordering testable without a DOM and leaves one
@@ -32,8 +33,7 @@ export type BootInterrupt =
   | "grant-welcome"
   | "username-claim"
   | "lapse-notice"
-  | "grant-ended"
-  | "rewards";
+  | "grant-ended";
 
 export interface BootInterruptInputs {
   /**
@@ -60,12 +60,6 @@ export interface BootInterruptInputs {
    * the two grant notices. Failing it lets the next interrupt take the boot.
    */
   grantStringsReady: boolean;
-  /**
-   * How many of the account's unclaimed rewards can be claimed now
-   * (isRewardClaimable): held ones don't count, since on their own they'd
-   * open the popup every boot with nothing to do.
-   */
-  rewardCount: number;
   /** claimPromptDue(...) — the decay rule below. */
   claimPromptDue: boolean;
   /**
@@ -85,10 +79,10 @@ export interface BootInterruptInputs {
  * desktop shell serves the renderer from its own privileged scheme at
  * `app://openfront/index.html` (openfront-desktop src/main/protocol.ts,
  * GAME_URL), so the pathname there is ALWAYS "/index.html" and a bare "/" test
- * is never true. That is not new — the TEMPORARY#### rename prompt and the
- * unclaimed-rewards popup have both been dead on Steam for the same reason —
- * but the claim prompt is aimed squarely at Steam buyers, so it would have
- * shipped never having fired for the population it exists for.
+ * is never true. That is not new — the TEMPORARY#### rename prompt has been
+ * dead on Steam for the same reason — but the claim prompt is aimed squarely
+ * at Steam buyers, so it would have shipped never having fired for the
+ * population it exists for.
  *
  * Gated on the shell rather than accepted everywhere: on the web "/index.html"
  * is reachable directly and is not the homepage, and widening the rule there
@@ -232,8 +226,6 @@ function entitled(status: string | undefined): boolean {
  *    at risk, but every day it goes unsaid is a day the player believes they
  *    are about to be charged. Marks itself shown when the lapse notice covers
  *    it, so a former grant holder with a reserved name hears it once.
- * 6. `rewards` — money already in the account. Nothing is at risk and it
- *    survives to the next load unchanged, so it always yields.
  *
  * 1 and 3 are mutually exclusive by state (a TEMPORARY#### rename IS a name),
  * as are 3 and 4 (`premium` versus `claimed`). The order is stated anyway
@@ -270,8 +262,6 @@ export function nextBootInterrupt(
   if (inputs.lapseNoticeDue) return "lapse-notice";
 
   if (inputs.grantEndedDue && inputs.grantStringsReady) return "grant-ended";
-
-  if (inputs.rewardCount > 0) return "rewards";
 
   return null;
 }
@@ -439,10 +429,9 @@ export const USERNAME_FORM_HASH = "modal=change-username";
  *
  * A precondition on the interrupt, not a bail inside it. Answering "not yet"
  * from inside runBootInterrupt would silently cost the boot: the claim prompt
- * has already won the ranking by then, so nothing else gets a turn and an
- * entitled player holding unclaimed rewards would see neither — where main
- * would simply have opened the rewards popup. Asked here, the claim prompt is
- * never chosen and rewards takes the boot by the ordinary ordering.
+ * has already won the ranking by then, so nothing else gets a turn, and the
+ * player would never see the prompt on that launch. Asked here, the claim
+ * prompt is never chosen and the next-ranked interrupt takes the boot.
  *
  * Only ever false off English, which is a static import.
  */
@@ -498,8 +487,6 @@ export interface BootInterruptPorts {
   tierName(tier: string): string;
   /** Sets window.location.hash. */
   navigate(hash: string): void;
-  /** Opens the unclaimed-rewards popup. */
-  openRewards(): void;
   /** Persists the whole claim-prompt map. */
   storeClaimPrompt(store: ClaimPromptStore): void;
   /**
@@ -605,7 +592,7 @@ async function runInterrupt(
       // Readiness of these strings is a precondition on the interrupt, checked
       // by claimPromptStringsReady before the ranking picks it — not a bail
       // here. Bailing here would consume the boot and leave an entitled player
-      // with unclaimed rewards seeing neither.
+      // without the prompt on that launch.
       const body = ports.translate(BOOT_INTERRUPT_KEYS.claimBody);
       const heading = ports.translate(BOOT_INTERRUPT_KEYS.claimHeading);
       const confirmText = ports.translate(BOOT_INTERRUPT_KEYS.claimConfirm);
@@ -648,9 +635,6 @@ async function runInterrupt(
       return;
     }
     case "lapse-notice":
-      return;
-    case "rewards":
-      ports.openRewards();
       return;
     case null:
       return;

@@ -42,7 +42,6 @@ function boot(
     grantWelcomeDue: false,
     grantEndedDue: false,
     grantStringsReady: true,
-    rewardCount: 0,
     claimPromptDue: true,
     claimStringsReady: true,
     ...overrides,
@@ -63,7 +62,6 @@ describe("nextBootInterrupt", () => {
       username: null,
       usernameBase: "TEMPORARY1234",
       lapseNoticeDue: true,
-      rewardCount: 4,
     });
     expect(nextBootInterrupt(everythingAtOnce)).toBeNull();
   });
@@ -75,7 +73,6 @@ describe("nextBootInterrupt", () => {
           username: "TEMPORARY1234",
           usernameBase: "TEMPORARY1234",
           lapseNoticeDue: true,
-          rewardCount: 3,
         }),
       ),
     ).toBe("username-temporary");
@@ -112,29 +109,9 @@ describe("nextBootInterrupt", () => {
     ).toBeNull();
   });
 
-  // Rewards is the one thing here with nothing at stake — it survives to the
-  // next load unchanged — so it yields to all three.
-  it("lets the claim prompt beat the rewards popup", () => {
-    expect(
-      nextBootInterrupt(
-        boot({ username: null, usernameBase: null, rewardCount: 2 }),
-      ),
-    ).toBe("username-claim");
-  });
-
-  it("lets the lapse notice beat the rewards popup", () => {
-    expect(
-      nextBootInterrupt(boot({ lapseNoticeDue: true, rewardCount: 2 })),
-    ).toBe("lapse-notice");
-  });
-
-  it("shows rewards when it is the only thing pending", () => {
-    expect(nextBootInterrupt(boot({ rewardCount: 1 }))).toBe("rewards");
-  });
-
-  // The grant that makes someone a day-0 subscriber also mints the signup-bonus
-  // rewards, so this exact pair is the ordinary first boot rather than a corner
-  // case — and it is the collision the sequencer was built for.
+  // The grant that makes someone a day-0 subscriber also wants to invite them
+  // to claim a name, so this exact pair is the ordinary first boot rather than
+  // a corner case — and it is the collision the sequencer was built for.
   it("resolves the day-0 buyer's collision to the claim prompt", () => {
     expect(
       nextBootInterrupt(
@@ -142,7 +119,6 @@ describe("nextBootInterrupt", () => {
           usernameStatus: "premium",
           username: null,
           usernameBase: null,
-          rewardCount: 3,
         }),
       ),
     ).toBe("username-claim");
@@ -150,17 +126,16 @@ describe("nextBootInterrupt", () => {
 
   // Decay does not promote the next contender past its own gate — it just
   // stops this one, and whatever is genuinely pending takes the boot.
-  it("falls through to rewards once the claim prompt is spent", () => {
+  it("stays quiet once the claim prompt is spent", () => {
     expect(
       nextBootInterrupt(
         boot({
           username: null,
           usernameBase: null,
           claimPromptDue: false,
-          rewardCount: 2,
         }),
       ),
-    ).toBe("rewards");
+    ).toBeNull();
   });
 });
 
@@ -363,8 +338,8 @@ describe("isCleanHomepage", () => {
   // The blocking case. The desktop shell serves the renderer from
   // app://openfront/index.html, so a bare pathname === "/" test is never true
   // there and every interrupt below it is unreachable on Steam — including
-  // the TEMPORARY#### prompt and the rewards popup, which have both been dead
-  // in the Steam build for exactly this reason.
+  // the TEMPORARY#### prompt, which has been dead in the Steam build for
+  // exactly this reason.
   it("accepts the desktop shell's index.html", () => {
     expect(isCleanHomepage({ pathname: "/index.html", hash: "" }, true)).toBe(
       true,
@@ -414,7 +389,6 @@ describe("runBootInterrupt", () => {
       navigated: [] as string[],
       stored: [] as ClaimPromptStore[],
       grantStored: [] as SteamGrantStore[],
-      rewardsOpened: 0,
     };
     const base: BootInterruptPorts = {
       // Stands in for a loaded language file: every key resolves to something
@@ -429,7 +403,6 @@ describe("runBootInterrupt", () => {
       },
       tierName: (tier) => `name(${tier})`,
       navigate: (hash) => calls.navigated.push(hash),
-      openRewards: () => calls.rewardsOpened++,
       storeClaimPrompt: (store) => calls.stored.push(store),
       updateSteamGrant: (update) =>
         calls.grantStored.push(update(context.grantStore)),
@@ -486,23 +459,10 @@ describe("runBootInterrupt", () => {
     for (const interrupt of [
       "username-temporary",
       "lapse-notice",
-      "rewards",
       null,
     ] as const) {
       const calls = await run(interrupt);
       expect(calls.stored, String(interrupt)).toEqual([]);
-    }
-  });
-
-  it("opens the rewards popup, and only for rewards", async () => {
-    expect((await run("rewards")).rewardsOpened).toBe(1);
-    for (const interrupt of [
-      "username-temporary",
-      "username-claim",
-      "lapse-notice",
-      null,
-    ] as const) {
-      expect((await run(interrupt)).rewardsOpened, String(interrupt)).toBe(0);
     }
   });
 
@@ -516,7 +476,6 @@ describe("runBootInterrupt", () => {
       navigated: [],
       stored: [],
       grantStored: [],
-      rewardsOpened: 0,
     });
   });
 
@@ -528,7 +487,6 @@ describe("runBootInterrupt", () => {
       navigated: [],
       stored: [],
       grantStored: [],
-      rewardsOpened: 0,
     });
   });
 });
@@ -753,9 +711,9 @@ describe("claimPromptStringsReady", () => {
 });
 
 // The gap: bailing inside runBootInterrupt consumed the boot, so an entitled
-// non-English player holding unclaimed rewards saw neither the prompt nor the
-// rewards popup that main would have opened. Readiness is a precondition on
-// the interrupt, so failing it lets the next-ranked one take the boot.
+// non-English player never saw the prompt on that launch. Readiness is a
+// precondition on the interrupt, so failing it lets the next-ranked one take
+// the boot.
 describe("an unready claim prompt yields the boot rather than eating it", () => {
   const unready = (key: string) =>
     (
@@ -777,22 +735,20 @@ describe("an unready claim prompt yields the boot rather than eating it", () => 
     grantWelcomeDue: false,
     grantEndedDue: false,
     grantStringsReady: false,
-    rewardCount: 2,
     claimPromptDue: true,
     claimStringsReady: claimPromptStringsReady(unready),
   };
 
   it("does not choose the claim prompt", () => {
     expect(inputs.claimStringsReady).toBe(false);
-    expect(nextBootInterrupt(inputs)).toBe("rewards");
+    expect(nextBootInterrupt(inputs)).toBeNull();
   });
 
-  it("opens rewards and writes no claim record", async () => {
+  it("leaves the boot quiet and writes no claim record", async () => {
     const calls = {
       confirmed: [] as string[],
       navigated: [] as string[],
       stored: [] as ClaimPromptStore[],
-      rewardsOpened: 0,
     };
     await runBootInterrupt(
       nextBootInterrupt(inputs),
@@ -806,24 +762,15 @@ describe("an unready claim prompt yields the boot rather than eating it", () => 
         alert: async () => {},
         tierName: (tier) => tier,
         navigate: (hash) => calls.navigated.push(hash),
-        openRewards: () => calls.rewardsOpened++,
         storeClaimPrompt: (store) => calls.stored.push(store),
         updateSteamGrant: () => {},
         markNoticeSeen: () => {},
         now: () => 1_757_000_000_000,
       },
     );
-    expect(calls.rewardsOpened).toBe(1);
     expect(calls.stored).toEqual([]);
     expect(calls.confirmed).toEqual([]);
     expect(calls.navigated).toEqual([]);
-  });
-
-  // With nothing else pending the boot is simply quiet, and the allowance is
-  // still intact for the next launch.
-  it("stays quiet, and unspent, when rewards are not waiting either", async () => {
-    const alone = { ...inputs, rewardCount: 0 };
-    expect(nextBootInterrupt(alone)).toBeNull();
   });
 });
 
@@ -842,7 +789,6 @@ describe("the Steam grant notices in the ordering", () => {
           grantWelcomeDue: true,
           username: null,
           usernameBase: null,
-          rewardCount: 3,
         }),
       ),
     ).toBe("grant-welcome");
@@ -868,29 +814,26 @@ describe("the Steam grant notices in the ordering", () => {
     ).toBe("lapse-notice");
   });
 
-  it("signs off an ended grant ahead of the rewards popup", () => {
-    expect(
-      nextBootInterrupt(boot({ grantEndedDue: true, rewardCount: 2 })),
-    ).toBe("grant-ended");
+  it("signs off an ended grant", () => {
+    expect(nextBootInterrupt(boot({ grantEndedDue: true }))).toBe(
+      "grant-ended",
+    );
   });
 
   // Same rule as the claim prompt: a key echoed back must not spend the only
   // explanation the buyer gets, and must not cost the boot either.
-  it("falls through when the grant strings have not landed", () => {
+  it("stays quiet when the grant strings have not landed", () => {
     expect(
       nextBootInterrupt(
         boot({
           grantWelcomeDue: true,
           grantStringsReady: false,
-          rewardCount: 1,
         }),
       ),
-    ).toBe("rewards");
+    ).toBeNull();
     expect(
-      nextBootInterrupt(
-        boot({ grantEndedDue: true, grantStringsReady: false, rewardCount: 1 }),
-      ),
-    ).toBe("rewards");
+      nextBootInterrupt(boot({ grantEndedDue: true, grantStringsReady: false })),
+    ).toBeNull();
   });
 });
 
@@ -911,7 +854,6 @@ describe("running the Steam grant notices", () => {
       alerted: [] as { body: string; heading: string }[],
       grantStored: [] as SteamGrantStore[],
       params: [] as (Record<string, string | number> | undefined)[],
-      rewardsOpened: 0,
     };
     const base: BootInterruptPorts = {
       translate: (key, params) => {
@@ -924,7 +866,6 @@ describe("running the Steam grant notices", () => {
       },
       tierName: (tier) => `name(${tier})`,
       navigate: () => {},
-      openRewards: () => calls.rewardsOpened++,
       storeClaimPrompt: () => {},
       updateSteamGrant: (update) => calls.grantStored.push(update(grantStore)),
       markNoticeSeen: () => {},
@@ -1001,8 +942,8 @@ describe("running the Steam grant notices", () => {
     expect(calls.grantStored).toEqual([]);
   });
 
-  it("opens no rewards and touches no claim record", async () => {
-    const { base, calls } = ports();
+  it("touches no claim record", async () => {
+    const { base } = ports();
     const claimStored: ClaimPromptStore[] = [];
     base.storeClaimPrompt = (store) => claimStored.push(store);
     for (const interrupt of ["grant-welcome", "grant-ended"] as const) {
@@ -1012,7 +953,6 @@ describe("running the Steam grant notices", () => {
         base,
       );
     }
-    expect(calls.rewardsOpened).toBe(0);
     expect(claimStored).toEqual([]);
   });
 });
@@ -1083,7 +1023,6 @@ describe("an interrupt the player never answered", () => {
       },
       tierName: (tier) => tier,
       navigate: (hash) => calls.navigated.push(hash),
-      openRewards: () => {},
       storeClaimPrompt: (store) => calls.claimStored.push(store),
       updateSteamGrant: (update) =>
         calls.grantStored.push(update(context.grantStore)),

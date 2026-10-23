@@ -1,10 +1,5 @@
 import type { NewsItem, StreamsFeed } from "@openfront/shared/ApiSchemas";
 import {
-  ClaimAllRewardsResponse,
-  ClaimAllRewardsResponseSchema,
-  ClaimRewardHeldResponseSchema,
-  ClaimRewardResponse,
-  ClaimRewardResponseSchema,
   GetMyTribeNamesResponse,
   GetMyTribeNamesResponseSchema,
   IdentityTokenAudiencesResponseSchema,
@@ -321,15 +316,6 @@ export function invalidateUserMe() {
   __userMe = null;
 }
 
-/**
- * The profile as it is now, for a caller that needs it fresh but must not
- * disturb everyone else's copy: getUserMe's cache is left as it was whatever
- * this answers, so a failed request can never stand in for a good profile.
- */
-export async function fetchUserMeUncached(): Promise<UserMeResponse | false> {
-  return (await requestUserMe()).profile;
-}
-
 export type DeleteAccountResult =
   // 204: deletion queued — the server deletes the account 24 hours later.
   | { ok: true }
@@ -437,7 +423,7 @@ export type SetVisibilityResult =
 // the desired state. Invalidates the cached /users/@me on success so the next
 // read reflects it.
 async function putVisibility(
-  setting: "level_visibility" | "search_visibility",
+  setting: "search_visibility",
   hidden: boolean,
 ): Promise<SetVisibilityResult> {
   try {
@@ -472,13 +458,6 @@ async function putVisibility(
     console.error(`PUT ${setting}: request failed`, e);
     return { ok: false, code: "failed" };
   }
-}
-
-// "Hide my level".
-export function setLevelVisibility(
-  hidden: boolean,
-): Promise<SetVisibilityResult> {
-  return putVisibility("level_visibility", hidden);
 }
 
 // "Keep my profile out of search engines" (the public profile page is served
@@ -1465,96 +1444,6 @@ export async function purchaseCosmeticPack(
   } catch (e) {
     console.error("purchaseCosmeticPack: request failed", e);
     return { ok: false, code: "failed" };
-  }
-}
-
-// POST /rewards/:rewardId/claim — claims a single unclaimed reward and
-// credits the balance atomically. "not_found" covers unknown, already-claimed
-// and other players' rewards (indistinguishable by design); the usual cause is
-// a double-click or a second device claiming first, so callers should re-fetch
-// /users/@me and re-render rather than surface an error. `{ held }` is a reward
-// that can't be claimed yet (e.g. "trust": level Plutonium on an account that
-// isn't trusted): a 403 naming the hold, whose kind is passed on as named. It
-// stays pending, so nothing is lost.
-export async function claimReward(
-  rewardId: string,
-): Promise<ClaimRewardResponse | "not_found" | { held: string } | false> {
-  try {
-    const response = await fetch(
-      `${getApiBase()}/rewards/${encodeURIComponent(rewardId)}/claim`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: await getAuthHeader(),
-        },
-      },
-    );
-    if (response.status === 401) {
-      await logOut();
-      return false;
-    }
-    if (response.status === 404) return "not_found";
-    if (response.status === 403) {
-      const hold = ClaimRewardHeldResponseSchema.safeParse(
-        await response.json().catch(() => null),
-      );
-      if (hold.success) return { held: hold.data.held };
-    }
-    if (!response.ok) {
-      console.error(
-        "claimReward: request failed",
-        response.status,
-        response.statusText,
-      );
-      return false;
-    }
-    const parsed = ClaimRewardResponseSchema.safeParse(await response.json());
-    if (!parsed.success) {
-      console.error("claimReward: Zod validation failed", parsed.error);
-      return false;
-    }
-    return parsed.data;
-  } catch (e) {
-    console.error("claimReward: request failed", e);
-    return false;
-  }
-}
-
-// POST /rewards/claim-all — claims all pending rewards in one transaction.
-// Succeeds (with an empty `claimed`) even when nothing is pending.
-export async function claimAllRewards(): Promise<
-  ClaimAllRewardsResponse | false
-> {
-  try {
-    const response = await fetch(`${getApiBase()}/rewards/claim-all`, {
-      method: "POST",
-      headers: {
-        Authorization: await getAuthHeader(),
-      },
-    });
-    if (response.status === 401) {
-      await logOut();
-      return false;
-    }
-    if (!response.ok) {
-      console.error(
-        "claimAllRewards: request failed",
-        response.status,
-        response.statusText,
-      );
-      return false;
-    }
-    const parsed = ClaimAllRewardsResponseSchema.safeParse(
-      await response.json(),
-    );
-    if (!parsed.success) {
-      console.error("claimAllRewards: Zod validation failed", parsed.error);
-      return false;
-    }
-    return parsed.data;
-  } catch (e) {
-    console.error("claimAllRewards: request failed", e);
-    return false;
   }
 }
 

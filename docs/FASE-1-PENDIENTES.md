@@ -12,7 +12,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
 | 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
-| 4 · Progresión comercial y cosméticos | En curso | — |
+| 4 · Progresión comercial y cosméticos | En curso (4a hecho) | `4652d4751`, `781ffb17c`, ver 4a-3 |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
 | 6 · Recorte de `Api.ts` | Pendiente | — |
 
@@ -66,48 +66,61 @@ Esta es la lista de supervivientes del Grupo 4 y de los restos del Grupo 3. La
 Fase 1 **no se cierra** hasta que quede vacía. Cada ítem indica el subgrupo que
 lo elimina; al borrarlo se marca la casilla y se tacha el nombre.
 
-### 4a · Progresión en partida, badges de nivel y cuenta
+### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
-- [ ] `src/client/components/GameXpPanel.ts` — 4a-1
-- [ ] `src/client/ProvisionalXp.ts` — 4a-1
-- [ ] `src/client/ProvisionalXpAtDeath.ts` — 4a-1
-- [ ] `src/client/XpMultipliers.ts` — 4a-1
-- [ ] `src/client/components/LegendCeremony.ts` — 4a-1
-- [ ] `src/client/MomentShare.ts` — 4a-1
-- [ ] `src/client/components/PrestigeFlow.ts` — 4a-1
-- [ ] `src/client/components/FlareCosmetic.ts` — 4a-1
-- [ ] `src/client/hud/layers/WinModal.ts` — quitar sólo las secciones de XP, Legend, hitos y promo de cosméticos — 4a-1
-- [ ] `src/client/components/LevelBadge.ts` — 4a-2
-- [ ] `src/client/components/LevelBadgeFill.ts` — 4a-2
-- [ ] `src/client/components/LevelBadgeIcons.ts` — 4a-2
-- [ ] `src/client/components/LevelBadgeLargeIcons.ts` — 4a-2
-- [ ] `src/client/components/LevelBadgeSlot.ts` — 4a-2
-- [ ] `src/client/OwnLevelBadge.ts` — 4a-2
-- [ ] `src/client/LobbyRosterLevels.ts` — 4a-2
-- [ ] `src/client/ClientGameRunner.ts` — quitar `rememberLobbyRoster` y el wiring de badges — 4a-2
-- [ ] `src/client/hud/layers/PlayerPanel.ts` — quitar el badge de nivel — 4a-2
-- [ ] `src/client/components/ProfileCard.ts` — 4a-3
-- [ ] `src/client/components/ProfileProgression.ts` — 4a-3
-- [ ] `src/client/PlayerProgress.ts` — 4a-3
-- [ ] `src/client/ProvisionalProgress.ts` — 4a-3
-- [ ] `src/client/Progression.ts` — 4a-3
-- [ ] `src/client/ProgressionAccount.ts` — 4a-3
-- [ ] `src/client/ProgressionApi.ts` — 4a-3
-- [ ] `src/client/components/ProgressionSection.ts` — 4a-3
-- [ ] `src/client/components/RewardTrack.ts` — 4a-3
-- [ ] `src/client/components/RewardsPanel.ts` — 4a-3
-- [ ] `src/client/RewardsModal.ts` — 4a-3
-- [ ] `src/client/RewardClaims.ts` — 4a-3
-- [ ] `src/client/GameRewards.ts` — 4a-3
-- [ ] `src/client/components/XpBar.ts` — 4a-3
-- [ ] `src/client/components/PastGameXpCard.ts` — 4a-3
-- [ ] `src/client/Main.ts` — quitar rewards modal, arranque de progresión, boot interrupt y ruta de inventario — 4a-3
-- [ ] `src/client/AccountModal.ts` — quitar tab de progresión — 4a-3
-- [ ] `src/client/PlayerProfileModal.ts` — quitar nivel y progresión — 4a-3
-- [ ] `src/client/GameStatsModal.ts` — quitar XP y progresión — 4a-3
-- [ ] `src/client/components/NavAccountMenu.ts` — quitar nivel y badge — 4a-3
-- [ ] `src/client/components/AccountSettingsPanel.ts` — quitar settings de progresión/cosméticos — 4a-3
-- [ ] `src/client/Api.ts` — quitar endpoints de nivel/progresión/rewards — 4a-3
+Los tres subgrupos se commitearon por separado. `ProvisionalXp`, `XpMultipliers`,
+`MomentShare`, `PrestigeFlow` y `FlareCosmetic` se movieron de 4a-1 a 4a-3
+porque perfil y cuenta todavía los consumían.
+
+#### 4a-1 · `4652d4751`
+
+- [x] ~~`src/client/components/GameXpPanel.ts`~~
+- [x] ~~`src/client/ProvisionalXpAtDeath.ts`~~
+- [x] ~~`src/client/components/LegendCeremony.ts`~~
+- [x] ~~`src/client/hud/layers/WinModal.ts`~~ — sin XP, Legend, hitos, share ni promo de cosméticos
+
+#### 4a-2 · `781ffb17c`
+
+- [x] ~~`src/client/components/LevelBadge.ts`~~
+- [x] ~~`src/client/components/LevelBadgeFill.ts`~~
+- [x] ~~`src/client/components/LevelBadgeIcons.ts`~~
+- [x] ~~`src/client/components/LevelBadgeLargeIcons.ts`~~
+- [x] ~~`src/client/components/LevelBadgeSlot.ts`~~
+- [x] ~~`src/client/OwnLevelBadge.ts`~~
+- [x] ~~`src/client/LobbyRosterLevels.ts`~~
+- [x] ~~`src/client/ClientGameRunner.ts`~~ — sin `rememberLobbyRoster` ni wiring de badges
+- [x] ~~`src/client/hud/layers/PlayerPanel.ts`~~ — sin badge de nivel
+
+#### 4a-3 · `refactor: remove the account and profile progression UI`
+
+- [x] ~~`src/client/ProvisionalXp.ts`~~
+- [x] ~~`src/client/XpMultipliers.ts`~~
+- [x] ~~`src/client/MomentShare.ts`~~
+- [x] ~~`src/client/components/PrestigeFlow.ts`~~
+- [x] ~~`src/client/components/FlareCosmetic.ts`~~
+- [x] ~~`src/client/components/ProfileCard.ts`~~
+- [x] ~~`src/client/components/ProfileProgression.ts`~~
+- [x] ~~`src/client/PlayerProgress.ts`~~
+- [x] ~~`src/client/ProvisionalProgress.ts`~~
+- [x] ~~`src/client/Progression.ts`~~
+- [x] ~~`src/client/ProgressionAccount.ts`~~
+- [x] ~~`src/client/ProgressionApi.ts`~~
+- [x] ~~`src/client/components/ProgressionSection.ts`~~
+- [x] ~~`src/client/components/RewardTrack.ts`~~
+- [x] ~~`src/client/components/RewardsPanel.ts`~~
+- [x] ~~`src/client/RewardsModal.ts`~~
+- [x] ~~`src/client/RewardClaims.ts`~~
+- [x] ~~`src/client/GameRewards.ts`~~
+- [x] ~~`src/client/components/XpBar.ts`~~
+- [x] ~~`src/client/components/PastGameXpCard.ts`~~
+- [x] ~~`src/client/Main.ts`~~ — sin rewards modal, arranque de progresión ni boot interrupt
+- [x] ~~`src/client/AccountModal.ts`~~ — sin tab de progresión
+- [x] ~~`src/client/PlayerProfileModal.ts`~~ — sin nivel ni progresión
+- [x] ~~`src/client/GameStatsModal.ts`~~ — sin XP
+- [x] ~~`src/client/components/NavAccountMenu.ts`~~ — sin nivel ni badge
+- [x] ~~`src/client/components/AccountSettingsPanel.ts`~~ — sin settings de progresión
+- [x] ~~`src/client/Api.ts`~~ — sin endpoints de nivel, progresión ni rewards
+- [x] `resources/lang/en.json` — 163 claves huérfanas eliminadas
 
 ### 4b · Inventario, tienda cosmética y fondo de la home
 

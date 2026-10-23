@@ -29,11 +29,6 @@ vi.mock("../../src/client/Api", () => ({
   })),
 }));
 
-// The visitor banner asks who is viewing; these tests don't sign anyone in.
-vi.mock("../../src/client/ProgressionAccount", () => ({
-  resolveXpAccount: vi.fn(async () => ({ kind: "unknown" })),
-}));
-
 vi.mock("src/client/ClientEnv", () => ({
   ClientEnv: {
     workerPath: vi.fn(() => "w0"),

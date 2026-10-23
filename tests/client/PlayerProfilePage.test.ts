@@ -10,7 +10,6 @@ import {
 } from "vitest";
 
 const fetchPublicPlayerProfileMock = vi.hoisted(() => vi.fn());
-const viewer = vi.hoisted(() => ({ kind: "unknown" as string }));
 
 vi.mock("../../src/client/Utils", () => ({
   translateText: vi.fn((key: string) => key),
@@ -24,14 +23,6 @@ vi.mock("../../src/client/Api", () => ({
     results: [],
     nextCursor: null,
   })),
-}));
-
-vi.mock("../../src/client/ProgressionApi", () => ({
-  fetchPublicPlayerProgress: vi.fn(async () => false),
-}));
-
-vi.mock("../../src/client/ProgressionAccount", () => ({
-  resolveXpAccount: vi.fn(async () => ({ kind: viewer.kind })),
 }));
 
 vi.mock(
@@ -118,7 +109,6 @@ describe("public profile page", () => {
   beforeEach(async () => {
     fetchPublicPlayerProfileMock.mockReset();
     fetchPublicPlayerProfileMock.mockResolvedValue(profile);
-    viewer.kind = "unknown";
     history.replaceState(null, "", "/");
 
     leaderboardOpens = 0;

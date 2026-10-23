@@ -112,7 +112,6 @@ vi.mock("../../src/client/components/CopyButton", () => ({}));
 vi.mock("../../src/client/components/CurrencyDisplay", () => ({}));
 vi.mock("../../src/client/components/Difficulties", () => ({}));
 vi.mock("../../src/client/components/FriendsList", () => ({}));
-vi.mock("../../src/client/components/RewardsPanel", () => ({}));
 vi.mock("../../src/client/components/SubscriptionPanel", () => ({}));
 
 class FakeIntersectionObserver {
