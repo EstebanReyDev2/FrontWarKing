@@ -12,14 +12,14 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
 | 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
 | 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
-| 4 · Progresión comercial y cosméticos | En curso (4a hecho) | `4652d4751`, `781ffb17c`, `85f8dc8d4` |
+| 4 · Progresión comercial y cosméticos | Hecho (4a y 4b) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5` |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
 | 6 · Recorte de `Api.ts` | Pendiente | — |
 
 ### Cómo se verifica cada grupo
 
 La línea base no son "86 fallos": son **87 fallos con nombre y apellido**, más
-4 flaky. Están en `docs/baseline-failures.txt` y `docs/baseline-flaky.txt`,
+6 flaky. Están en `docs/baseline-failures.txt` y `docs/baseline-flaky.txt`,
 medidos con dos corridas consecutivas de la suite completa sobre `main`.
 
 Para cerrar un grupo:
@@ -58,6 +58,18 @@ mensaje de `fb7d7e0a1` y en el reporte del grupo.
 `@stripe/stripe-js` salió de `package.json` y del lockfile: era la única
 dependencia de pago y sólo la importaban `StripeInline.ts` e `InlineCheckout.ts`.
 `resources/lang/en.json` perdió 111 claves huérfanas.
+
+### Resultado del Grupo 4b
+
+Dos corridas completas consecutivas: **81 fallos por corrida, los 81 de la
+línea base, cero regresiones por nombre**. Typecheck y lint en 0.
+
+Contra la línea base pre-Fase 1 desaparecieron 6 fallos estables y 6 flaky:
+5 estables y 2 flaky ya venían de 4a; 4b sumó el estable de `InventoryModal` y
+sus 4 flaky. Se borraron 24 archivos de test y se podaron 16 casos de
+`UserSettings.test.ts`; se agregaron 5 tests de caracterización en
+`tests/client/CosmeticsCharacterization.test.ts`. El detalle está en el reporte
+del grupo.
 
 
 ## Borrado obligatorio antes de cerrar la Fase 1
@@ -122,30 +134,43 @@ porque perfil y cuenta todavía los consumían.
 - [x] ~~`src/client/Api.ts`~~ — sin endpoints de nivel, progresión ni rewards
 - [x] `resources/lang/en.json` — 163 claves huérfanas eliminadas
 
-### 4b · Inventario, tienda cosmética y fondo de la home
+### 4b · Inventario, tienda cosmética y fondo de la home — hecho
 
-- [ ] `src/client/InventoryModal.ts` — 4b
-- [ ] `src/client/components/InventoryLoadoutBar.ts` — 4b
-- [ ] `src/client/components/InventoryLoadoutMenu.ts` — 4b
-- [ ] `src/client/components/EquippedCosmeticsRow.ts` — 4b
-- [ ] `src/client/EquippedCosmetics.ts` — 4b
-- [ ] `src/client/components/CosmeticBackground.ts` — 4b
-- [ ] `src/client/components/CosmeticCard.ts` — 4b
-- [ ] `src/client/components/CosmeticInfo.ts` — 4b
-- [ ] `src/client/components/CosmeticPresentation.ts` — 4b
-- [ ] `src/client/components/CosmeticPreview.ts` — 4b
-- [ ] `src/client/components/CosmeticPreviewBubble.ts` — 4b
-- [ ] `src/client/components/CosmeticPreviewModal.ts` — 4b
-- [ ] `src/client/components/cosmetics/CosmeticRenderCanvas.ts` — 4b
-- [ ] `src/client/render/preview/CosmeticPreviewRenderer.ts` — 4b
-- [ ] `src/client/Cosmetics.ts` — reducir a la ruta de display; quitar compra, tienda, resolución y helpers muertos — 4b
-- [ ] `src/client/UserSettings.ts` — quitar loadouts y settings de inventario — 4b
-- [ ] `src/client/Api.ts` — quitar compra de cosméticos y listados de tienda — 4b
-- [ ] `index.html` — quitar `<inventory-modal>` — 4b
-- [ ] `src/client/Main.ts` — quitar ruta/nav de inventario y `LazyModals` — 4b
-- [ ] `src/client/components/LangSelector.ts` — quitar tags de inventario/cosméticos — 4b
-- [ ] `src/client/PlayPage.ts` — quitar el fondo cosmético de la home — 4b
-- [ ] Productores de `#modal=store` (`InventoryModal`, `EquippedCosmetics`) — 4b
+4b-1 `e9995885e` borró la UI; 4b-2 `107d40ab5` redujo el motor de cosméticos a
+la ruta de display. El detalle de tests y claves está en el reporte del grupo.
+
+#### 4b-1 · `e9995885e`
+
+- [x] ~~`src/client/InventoryModal.ts`~~
+- [x] ~~`src/client/components/InventoryLoadoutBar.ts`~~
+- [x] ~~`src/client/components/InventoryLoadoutMenu.ts`~~
+- [x] ~~`src/client/components/EquippedCosmeticsRow.ts`~~
+- [x] ~~`src/client/EquippedCosmetics.ts`~~
+- [x] ~~`src/client/components/CosmeticBackground.ts`~~
+- [x] ~~`src/client/components/CosmeticCard.ts`~~
+- [x] ~~`src/client/components/CosmeticInfo.ts`~~
+- [x] ~~`src/client/components/CosmeticPresentation.ts`~~
+- [x] ~~`src/client/components/CosmeticPreview.ts`~~
+- [x] ~~`src/client/components/CosmeticPreviewBubble.ts`~~
+- [x] ~~`src/client/components/CosmeticPreviewModal.ts`~~
+- [x] ~~`src/client/components/EffectsGrid.ts`~~
+- [x] ~~`src/client/components/PatternPreview.ts`~~
+- [x] ~~`src/client/components/EffectPreview.ts`~~
+- [x] ~~`src/client/components/cosmetics/CosmeticRenderCanvas.ts`~~
+- [x] ~~`src/client/render/preview/`~~ — renderer, ticker, map loader y territory pass
+- [x] ~~`index.html`~~ — sin `<inventory-modal>`
+- [x] ~~`src/client/Main.ts`~~ — sin ruta/nav de inventario ni entrada en `LazyModals`
+- [x] ~~`src/client/components/LangSelector.ts`~~ — sin tags de inventario/cosméticos
+- [x] ~~`src/client/PlayPage.ts`~~ — sin fondo cosmético
+- [x] ~~Productores de `#modal=store`~~ — cero
+- [x] ~~`main.store`~~ — sin consumidores
+
+#### 4b-2 · `107d40ab5`
+
+- [x] ~~`src/client/Cosmetics.ts`~~ — 11 exports, sin compra, tienda ni resolución
+- [x] ~~`src/client/UserSettings.ts`~~ — sin loadouts; quedan `PATTERN_KEY`, `FLAG_KEY`, `CROWN_KEY` y `EFFECTS_KEY`
+- [x] ~~`src/client/Api.ts`~~ — sin compra de cosméticos ni listados de tienda
+- [x] `resources/lang/en.json` — 74 claves en 4b-1 y 30 en 4b-2
 
 ### 4c · Restos de pagos y Steam
 
@@ -153,8 +178,6 @@ porque perfil y cuenta todavía los consumían.
 - [ ] `src/client/SubscriptionPolicy.ts` — 4c
 - [ ] `src/client/SteamGrantNotices.ts` — 4c
 - [ ] `translateCosmetic` en `src/client/Cosmetics.ts` — 4c
-- [ ] `main.store` — 4c
-- [ ] Verificar que no quede ningún productor de `#modal=store` — 4c
 
 ### Restos del Grupo 3 que no son de este grupo
 
@@ -279,16 +302,11 @@ SteamSDK" (las ramas `if (isDesktopShell())` y los `gamePortal.*` sin efecto).
   `purchaseOutcomeMessage()` y `classifyPurchaseReturn()`. Sin Stripe, sin Steam,
   sin llamadas a `Api.ts`.
 
-**Por qué:** `Cosmetics.ts` (Grupo 4) sigue importando esos cuatro símbolos para
-los botones de compra con moneda blanda/dura y para el retorno
-`#purchase-completed`. Borrarlos ahora obliga a cirugía sobre 1.699 líneas de
-cosméticos y mezcla el Grupo 3 con el 4. La fachada no abre ninguna pasarela:
-`startPurchase` siempre devuelve el error que el jugador ya veía cuando el
-checkout no estaba disponible.
+**Por qué:** `Cosmetics.ts` importaba esos cuatro símbolos para los botones de
+compra con moneda blanda/dura y para el retorno `#purchase-completed`. 4b-2 ya
+borró esos consumidores; la fachada quedó sin uso y no abre ninguna pasarela.
 
-**Cuándo:** Grupo 4, cuando se borren `purchaseCosmetic` y
-`handlePurchaseReturn` de `Cosmetics.ts`. Ahí desaparecen `Payments.ts` y sus
-tipos.
+**Cuándo:** 4c, junto con sus tipos. Ya no tiene consumidores.
 
 ### Referencias muertas que quedan a propósito
 
@@ -379,10 +397,10 @@ Abrí `http://localhost:9000`.
 
 - `STEAM_TIER_CHANGE_IN_APP = false`.
 
-**Por qué:** es una constante pura, sin dependencias, que `Cosmetics.ts` lee
+**Por qué:** es una constante pura, sin dependencias, que `Cosmetics.ts` leía
 para decidir el copy de cambio de tier. No hay lógica de pago.
 
-**Cuándo:** Grupo 4, junto con `Payments.ts`.
+**Cuándo:** 4c, junto con `Payments.ts`. 4b-2 ya borró su último consumidor.
 
 ### `CurrencyDisplay` e `InsufficientCurrencyDialog`
 
@@ -439,5 +457,5 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   con Fase 2.
 - `src/server` conserva los endpoints de pago; son server, no entran en la
   limpieza del cliente. Fase 2.
-- `Cosmetics.ts` conserva `purchaseCosmetic` y `handlePurchaseReturn` hasta el
-  Grupo 4; hoy llaman a la fachada inerte.
+- `src/client/Payments.ts` y `src/client/SubscriptionPolicy.ts` quedaron sin
+  consumidores tras 4b-2; se borran en 4c.
