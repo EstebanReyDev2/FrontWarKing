@@ -415,6 +415,42 @@ Abrí `http://localhost:9000`.
 
 **Cuándo:** Fase 2, con el login.
 
+## Ruido de consola esperado hasta Fase 2
+
+Con el cliente levantado y el API de `localhost:8787` apagado, la consola del
+navegador muestra errores que **no son regresiones**. Desaparecen cuando el
+server está arriba:
+
+- **CORS / `Failed to fetch`** en `cluster.json`, `streams.json`,
+  `auth/refresh` y `cosmetics.json`. El cliente los pide a `8787`; sin server,
+  el navegador corta la petición.
+- **`Server list API unreachable` / `Server list API still unreachable`**:
+  `ServerList.ts` cae al fallback offline.
+- **`Lobby socket ... closed (1001/1006)`**: Vite proxya `/w1` a `8787`; sin
+  server el WebSocket se cierra y `LobbySocket` reintenta.
+- **`No JWT found`, `Refreshing jwt`, `Refresh failed`**: no hay sesión y el
+  endpoint de refresh no responde.
+- **`Permissions Policy: Skipping unsupported feature name ...`**: los emite
+  el navegador al leer el atributo `allow` del iframe de `HelpModal` y el de
+  Cloudflare Turnstile. Son avisos por features que el navegador no reconoce,
+  no errores de la app.
+- **`SpawnExecution: cannot spawn Antarctica`**: el mapa World no encuentra
+  tile de spawn para Antártida. Es una advertencia del engine, no un fallo de
+  arranque.
+
+**Confirmación pre-Fase 1.** En un worktree de `main` (`6b9933ea6`) se verificó
+que ambos avisos ya existían: el iframe de `HelpModal.ts` con
+`allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope;
+picture-in-picture; web-share"` viene de `0fb2ee19b2` (15 sep 2026) y el
+`console.warn` de `SpawnExecution.ts` viene de `6112547273` (20 dic 2025); el
+archivo se movió después en `377db1773`. Ninguno de los dos archivos cambió
+entre `main` y la rama de Fase 1. Los avisos de Turnstile vienen de
+`challenges.cloudflare.com/turnstile/v0/api.js`, que también está en `main`.
+
+**Qué mirar en su lugar.** Para detectar regresiones reales, ignorá esa lista y
+buscá errores de módulos borrados, `Translation key not found`, o fallos del
+render/WebGL. El smoke test de cada grupo está arriba.
+
 ## Economía interna: qué se conserva
 
 ### `SubscriptionPolicy.ts` se borró
