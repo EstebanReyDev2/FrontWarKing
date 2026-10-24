@@ -7,20 +7,20 @@ se resuelve. Si algo de acá te sorprende, es porque está esperando su fase.
 
 Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 
-| Grupo | Estado | Commit |
-| --- | --- | --- |
-| 1 · Publicidad, tracking y noticias | Hecho | `45841321e` |
-| 2 · Portales (CrazyGames, Poki, Steam) | Hecho | `1cfcedc25`, `3bbd90009` |
-| 3 · Pagos y monetización | Hecho | `fb7d7e0a1`, `04f1cd5a6` |
-| 4 · Progresión comercial y cosméticos | Hecho (4a y 4b) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5` |
-| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente | — |
-| 6 · Recorte de `Api.ts` | Pendiente | — |
+| Grupo                                                     | Estado              | Commit                                                                       |
+| --------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------- |
+| 1 · Publicidad, tracking y noticias                       | Hecho               | `45841321e`                                                                  |
+| 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                     |
+| 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                     |
+| 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1` |
+| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente           | —                                                                            |
+| 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                            |
 
 ### Cómo se verifica cada grupo
 
-La línea base no son "86 fallos": son **87 fallos con nombre y apellido**, más
-6 flaky. Están en `docs/baseline-failures.txt` y `docs/baseline-flaky.txt`,
-medidos con dos corridas consecutivas de la suite completa sobre `main`.
+La línea base actual son **81 fallos estables y 0 flaky**, todos originados en
+`spawnSync bash/sh ENOENT` al correr los tests de los scripts de despliegue en
+Windows. Cualquier otro nombre que falle es una regresión.
 
 Para cerrar un grupo:
 
@@ -71,6 +71,17 @@ sus 4 flaky. Se borraron 24 archivos de test y se podaron 16 casos de
 `tests/client/CosmeticsCharacterization.test.ts`. El detalle está en el reporte
 del grupo.
 
+### Resultado del Grupo 4c
+
+Dos corridas completas consecutivas: **81 fallos por corrida, los 81 de la
+línea base, cero regresiones por nombre**. Typecheck y lint en 0. La suite quedó
+en 7.358 tests, 7.276 pasados y 81 fallados por corrida.
+
+Se borraron 50 tests: 32 de `SteamGrantNotices.test.ts`, 1 de
+`SubscriptionPolicy.test.ts`, 14 casos de `BootInterrupts.test.ts` y 3 de
+`UsernameInput.test.ts`. `resources/lang/en.json` perdió 8 claves huérfanas
+(`steam_grant.*` y `username.lapse_notice_after_*`). `LangSelector` perdió los
+tags `top-bar`, `level-badge` y `past-game-xp-card`, que ya no existen.
 
 ## Borrado obligatorio antes de cerrar la Fase 1
 
@@ -160,7 +171,7 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 - [x] ~~`src/client/render/preview/`~~ — renderer, ticker, map loader y territory pass
 - [x] ~~`index.html`~~ — sin `<inventory-modal>`
 - [x] ~~`src/client/Main.ts`~~ — sin ruta/nav de inventario ni entrada en `LazyModals`
-- [x] ~~`src/client/components/LangSelector.ts`~~ — sin tags de inventario/cosméticos
+- [x] ~~`src/client/LangSelector.ts`~~ — sin tags de inventario/cosméticos
 - [x] ~~`src/client/PlayPage.ts`~~ — sin fondo cosmético
 - [x] ~~Productores de `#modal=store`~~ — cero
 - [x] ~~`main.store`~~ — sin consumidores
@@ -172,17 +183,20 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 - [x] ~~`src/client/Api.ts`~~ — sin compra de cosméticos ni listados de tienda
 - [x] `resources/lang/en.json` — 74 claves en 4b-1 y 30 en 4b-2
 
-### 4c · Restos de pagos y Steam
+### 4c · Restos de pagos y Steam — hecho
 
-- [ ] `src/client/Payments.ts` — 4c
-- [ ] `src/client/SubscriptionPolicy.ts` — 4c
-- [ ] `src/client/SteamGrantNotices.ts` — 4c
-- [ ] `translateCosmetic` en `src/client/Cosmetics.ts` — 4c
+- [x] ~~`src/client/Payments.ts`~~
+- [x] ~~`src/client/SubscriptionPolicy.ts`~~
+- [x] ~~`src/client/SteamGrantNotices.ts`~~
+- [x] ~~`translateCosmetic` en `src/client/Cosmetics.ts`~~
+- [x] ~~`steam_grant.*` y `username.lapse_notice_after_*` en `en.json`~~ — 8 claves
+- [x] ~~Tags muertos en `src/client/LangSelector.ts`~~ — `top-bar`, `level-badge`, `past-game-xp-card`
 
-### Restos del Grupo 3 que no son de este grupo
+### Restos que no son de este grupo
 
 - [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5
 - [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5
+- [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder` — Grupo 6
 
 ## Deuda para Fase 2
 
@@ -194,6 +208,12 @@ backend por Supabase hay que decidir de dónde sale el catálogo (tabla, storage
 o archivo estático) y si el join de `PlayerCosmetics` se conserva o se elimina.
 No es deuda de la Fase 1: el render de cosméticos sigue funcionando con el
 contrato actual.
+
+Además, `fetchCosmetics()` pide `cosmetics.json` al servidor original con un
+timeout de 10 s. En Fase 2, sin ese servidor, la petición debe fallar rápido y
+el juego debe arrancar igual. Hay que verificar también que una URL inexistente
+en Vercel no devuelva el `index.html`: un fallback SPA haría pasar un 404 por un
+catálogo válido.
 
 ## Contratos del engine y del netcode
 
@@ -295,18 +315,14 @@ comportamiento observable no cambia.
 **Cuándo:** Fase 2, tarea "limpiar ramas muertas de DesktopShell/GamePortal/
 SteamSDK" (las ramas `if (isDesktopShell())` y los `gamePortal.*` sin efecto).
 
-### `Payments` como fachada inerte
+### `Payments` se borró
 
-- `src/client/Payments.ts` — sólo cuatro símbolos: `paymentsProvider()` →
-  `"stripe"`, `startPurchase()` → outcome `error` con `store.purchase_failed`,
-  `purchaseOutcomeMessage()` y `classifyPurchaseReturn()`. Sin Stripe, sin Steam,
-  sin llamadas a `Api.ts`.
+- `src/client/Payments.ts` — 4c (`cf37651a1`).
 
-**Por qué:** `Cosmetics.ts` importaba esos cuatro símbolos para los botones de
-compra con moneda blanda/dura y para el retorno `#purchase-completed`. 4b-2 ya
-borró esos consumidores; la fachada quedó sin uso y no abre ninguna pasarela.
+**Por qué:** 4b-2 borró sus últimos consumidores. Era una fachada inerte que no
+abría ninguna pasarela y sólo conservaba tipos y clasificadores sin uso.
 
-**Cuándo:** 4c, junto con sus tipos. Ya no tiene consumidores.
+**Cuándo:** hecho.
 
 ### Referencias muertas que quedan a propósito
 
@@ -320,28 +336,17 @@ borró esos consumidores; la fachada quedó sin uso y no abre ninguna pasarela.
   auto-retry se quitaron porque simulaban un shell que ya no existe.
 - `src/client/SteamLink.ts` y `LinkResult.ts` quedan por ser parte del login
   (Fase 2), aunque la UI que los abría ya no exista.
-- `src/client/EquippedCosmetics.ts` (`storeRouteFor`) y
-  `src/client/components/EquippedCosmeticsRow.ts` siguen armando deep links
-  `#modal=store...`; la fila los abre en una pestaña nueva. El router descarta
-  un `#modal=` desconocido con `replaceHash("")` y devuelve `true`, así que la
-  pestaña aterriza en la home y no hay excepción.
-- `src/client/InventoryModal.ts` hace lo mismo al elegir un cosmético no
-  poseído (`window.location.hash = "modal=store&tab=cosmetics"`). Es Grupo 4;
-  se borra junto con la tienda de cosméticos. La clave `main.store` sigue en
-  `en.json` justamente por este botón.
-- Los tests `EquippedCosmetics.test.ts`, `EquippedCosmeticsRow.test.ts` e
-  `InventoryModal.test.ts` siguen afirmando el string del hash; pasan porque la
-  función que lo arma no cambió.
+- No quedan productores de `#modal=store`: los deep links de `EquippedCosmetics`
+  e `InventoryModal` se borraron en 4b, y la clave `main.store` ya no existe en
+  `en.json`.
 
-### `SteamNotices` se borró
+### `SteamNotices` y `SteamGrantNotices` se borraron
 
-Sus únicos consumidores (`BootInterrupts.ts` y `Main.ts`) eran Steam puro. Con él
-se fue el interrupt `steam-notice` del pipeline de arranque y sus claves de
-traducción. `SteamGrantNotices` (meses de Steam Plus) sigue: no es checkout y
-está entrelazado con el arranque de sesión. Se va en el Grupo 4, junto con el
-resto del copy de suscripciones, o en Fase 2 si el arranque se reescribe antes.
-En una instalación sin compras de Steam queda inerte: no hay grants de Steam que
-avisar.
+`SteamNotices` se fue en el Grupo 2 y `SteamGrantNotices` en 4c. Con ellos se
+fueron los interrupts `steam-notice`, `grant-welcome` y `grant-ended`, sus
+puertos (`tierName`, `updateSteamGrant`), el almacén por cuenta en
+`localStorage` y las claves `steam_grant.*`. El aviso de lapse sigue existiendo
+para suscriptores, sin la variante posterior a un grant.
 
 ### Smoke test del Grupo 2
 
@@ -382,6 +387,25 @@ Abrí `http://localhost:9000`.
    `SubscriptionModal`. `steam-link-modal unavailable` sólo puede aparecer si
    tocás un flujo de link de Steam, nunca en el arranque.
 
+### Smoke test del Grupo 4c
+
+```
+npm run dev
+```
+
+Abrí `http://localhost:9000`.
+
+1. **Home y consola.** La home carga sin errores de módulos `SteamGrantNotices`,
+   `Payments` ni `SubscriptionPolicy`.
+2. **Cuenta vencida.** Iniciá sesión con una cuenta cuyo nombre esté por vencer:
+   el aviso de lapse aparece una sola vez y usa el texto ordinario
+   (`username.lapse_notice` o `username.lapse_notice_at_risk`), no una variante
+   `after_grant` / `after_free_access`.
+3. **Sin avisos de Steam.** No aparece ningún cartel de bienvenida ni de fin del
+   mes de Steam.
+4. **Deep link muerto.** `#modal=store` no abre nada y el hash se limpia.
+5. **Traducciones.** La consola no muestra `Translation key not found` por
+   `steam_grant.*` ni por `username.lapse_notice_after_*`.
 
 ### `window.adsEnabled`
 
@@ -391,16 +415,14 @@ Abrí `http://localhost:9000`.
 
 **Cuándo:** Fase 2, con el login.
 
-## Pagos: qué se conserva
+## Economía interna: qué se conserva
 
-### `SubscriptionPolicy.ts`
+### `SubscriptionPolicy.ts` se borró
 
-- `STEAM_TIER_CHANGE_IN_APP = false`.
+- `STEAM_TIER_CHANGE_IN_APP = false` — 4c (`cf37651a1`).
 
-**Por qué:** es una constante pura, sin dependencias, que `Cosmetics.ts` leía
-para decidir el copy de cambio de tier. No hay lógica de pago.
-
-**Cuándo:** 4c, junto con `Payments.ts`. 4b-2 ya borró su último consumidor.
+**Por qué:** era una constante pura sin lógica de pago. 4b-2 borró su último
+consumidor, así que no quedaba nada que la leyera.
 
 ### `CurrencyDisplay` e `InsufficientCurrencyDialog`
 
@@ -457,5 +479,3 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   con Fase 2.
 - `src/server` conserva los endpoints de pago; son server, no entran en la
   limpieza del cliente. Fase 2.
-- `src/client/Payments.ts` y `src/client/SubscriptionPolicy.ts` quedaron sin
-  consumidores tras 4b-2; se borran en 4c.
