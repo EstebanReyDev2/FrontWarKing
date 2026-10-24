@@ -46,7 +46,6 @@ vi.mock("../../src/client/CrazyGamesSDK", () => ({
 
 vi.mock("../../src/client/Cosmetics", () => ({
   fetchCosmetics: vi.fn(async () => null),
-  translateCosmetic: vi.fn((v: unknown) => v),
 }));
 
 vi.stubGlobal("localStorage", {

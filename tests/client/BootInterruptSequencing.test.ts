@@ -94,11 +94,8 @@ describe("boot sequencing against a real <username-input>", () => {
       translate: (key) => `t(${key})`,
       confirm: async () => false,
       alert: async () => {},
-      tierName: (tier) => tier,
       navigate: (hash) => calls.navigated.push(hash),
       storeClaimPrompt: () => {},
-      updateSteamGrant: () => {},
-      markNoticeSeen: () => {},
       now: () => Date.now(),
     };
     const player = userMe.player;
@@ -108,17 +105,10 @@ describe("boot sequencing against a real <username-input>", () => {
       username: player.username,
       usernameBase: player.usernameBase,
       lapseNoticeDue: shown,
-      grantWelcomeDue: false,
-      grantEndedDue: false,
-      grantStringsReady: true,
       claimPromptDue: true,
       claimStringsReady: true,
     });
-    await runBootInterrupt(
-      interrupt,
-      { claimStore: {}, grantStore: {}, publicId: "p" },
-      ports,
-    );
+    await runBootInterrupt(interrupt, { claimStore: {}, publicId: "p" }, ports);
     return { interrupt, ...calls };
   }
 

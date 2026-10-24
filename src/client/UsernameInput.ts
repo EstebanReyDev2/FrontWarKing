@@ -22,12 +22,6 @@ import {
   type ClaimGrace,
   type ResolvedPlayerName,
 } from "./PlayerName";
-import {
-  parseSteamGrantStore,
-  STEAM_GRANT_NOTICE_KEY,
-  steamGrantEnded,
-  steamGrantEndedShown,
-} from "./SteamGrantNotices";
 import { steamSDK } from "./SteamSDK";
 import {
   MAX_CLAN_TAG_LENGTH,
@@ -413,30 +407,9 @@ export class UsernameInput extends LitElement {
     // side think a notice is pending while the other thinks it is spent.
     const marker = lapseNoticeMarker(grace);
     if (localStorage.getItem(lapseNoticeKey) === marker) return;
-    // A former Steam grant holder never subscribed, so "your subscription
-    // ended... resubscribe" is the sentence that convinces them the game hid
-    // one. This notice is the first thing they see after the month ends, so
-    // it carries the sign-off and marks it shown below, or the boot sequencer
-    // would say it all again next launch. An admin comp or Discord-role grant
-    // with an end date never subscribed either: it gets the same shape
-    // without naming Steam or who granted it.
-    const endedGrant = steamGrantEnded(
-      parseSteamGrantStore(localStorage.getItem(STEAM_GRANT_NOTICE_KEY)),
-      this.userMe,
-      Date.now(),
-    );
-    const afterGrant = endedGrant !== null;
-    const key = !afterGrant
-      ? grace.atRisk
-        ? "username.lapse_notice_at_risk"
-        : "username.lapse_notice"
-      : endedGrant.steam
-        ? grace.atRisk
-          ? "username.lapse_notice_after_grant_at_risk"
-          : "username.lapse_notice_after_grant"
-        : grace.atRisk
-          ? "username.lapse_notice_after_free_access_at_risk"
-          : "username.lapse_notice_after_free_access";
+    const key = grace.atRisk
+      ? "username.lapse_notice_at_risk"
+      : "username.lapse_notice";
     const message = translateText(key, {
       name: grace.name,
       date: formatClaimDate(grace.expiresAt),
@@ -458,17 +431,6 @@ export class UsernameInput extends LitElement {
     // player dismisses it, and an unawaited promise that never settles would
     // let a second announcement through.
     localStorage.setItem(lapseNoticeKey, marker);
-    if (afterGrant && this.userMe !== null && this.userMe !== false) {
-      localStorage.setItem(
-        STEAM_GRANT_NOTICE_KEY,
-        JSON.stringify(
-          steamGrantEndedShown(
-            parseSteamGrantStore(localStorage.getItem(STEAM_GRANT_NOTICE_KEY)),
-            this.userMe.player.publicId,
-          ),
-        ),
-      );
-    }
     void showInGameAlert(message);
   }
 

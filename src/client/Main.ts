@@ -14,7 +14,7 @@ import {
 } from "@openfront/shared/WireSchemas";
 import { ClientEnv } from "src/client/ClientEnv";
 import { renderNavVersion } from "src/client/GameVersion";
-import { getUserMe, invalidateUserMe, markNoticeSeen } from "./Api";
+import { getUserMe, invalidateUserMe } from "./Api";
 import {
   getDesktopSessionState,
   reauthAfterPortalChange,
@@ -31,10 +31,9 @@ import {
   nextBootInterrupt,
   parseClaimPromptStore,
   runBootInterrupt,
-  steamGrantStringsReady,
 } from "./BootInterrupts";
 import type { JoinLobbyResult } from "./ClientGameRunner";
-import { getPlayerCosmeticsRefs, translateCosmetic } from "./Cosmetics";
+import { getPlayerCosmeticsRefs } from "./Cosmetics";
 import { desktopPresence, type PresencePayload } from "./DesktopPresence";
 import { subscribeDesktopSessionRecovery } from "./DesktopSessionRecovery";
 import {
@@ -85,13 +84,6 @@ import {
   startServerListPolling,
 } from "./ServerList";
 import type { SinglePlayerModal } from "./SinglePlayerModal";
-import {
-  parseSteamGrantStore,
-  recordSteamGrant,
-  STEAM_GRANT_NOTICE_KEY,
-  steamGrantEndedDue,
-  steamGrantWelcomeDue,
-} from "./SteamGrantNotices";
 import { steamSDK } from "./SteamSDK";
 import { initTelemetry } from "./Telemetry";
 import type { TokenLoginModal } from "./TokenLoginModal";
@@ -636,22 +628,6 @@ class Client {
 
     const onUserMe = async (userMeResponse: UserMeResponse | false) => {
       updateAccountNavButton(userMeResponse);
-      // Before the dispatch: <username-input> reads this store when it picks
-      // the lapse notice's wording, and the record has to be current by then.
-      const grantStoreBefore = parseSteamGrantStore(
-        localStorage.getItem(STEAM_GRANT_NOTICE_KEY),
-      );
-      const grantStore = recordSteamGrant(
-        grantStoreBefore,
-        userMeResponse,
-        Date.now(),
-      );
-      if (grantStore !== grantStoreBefore) {
-        localStorage.setItem(
-          STEAM_GRANT_NOTICE_KEY,
-          JSON.stringify(grantStore),
-        );
-      }
       // Snapshot in, dispatch and comparison inside — see
       // lapseShownAfterDispatch for why the snapshot cannot be read there.
       const lapseShown = lapseShownAfterDispatch(
@@ -666,11 +642,6 @@ class Client {
             }),
           ),
         () => localStorage.getItem(LAPSE_NOTICE_KEY),
-      );
-      // Re-read, not `grantStore`: a lapse notice that carried the grant
-      // sign-off marked it shown from inside the dispatch above.
-      const grantStoreAfterDispatch = parseSteamGrantStore(
-        localStorage.getItem(STEAM_GRANT_NOTICE_KEY),
       );
 
       if (userMeResponse !== false) {
@@ -707,23 +678,11 @@ class Client {
             username,
             usernameBase,
             lapseNoticeDue: lapseShown,
-            grantWelcomeDue: steamGrantWelcomeDue(
-              grantStoreAfterDispatch,
-              userMeResponse,
-              Date.now(),
-            ),
-            grantEndedDue: steamGrantEndedDue(
-              grantStoreAfterDispatch,
-              userMeResponse,
-              Date.now(),
-            ),
-            grantStringsReady: steamGrantStringsReady(translateText),
             claimPromptDue: claimPromptDue(claimStore, Date.now(), publicId),
             claimStringsReady: claimPromptStringsReady(translateText),
           }),
           {
             claimStore,
-            grantStore: grantStoreAfterDispatch,
             publicId,
           },
           {
@@ -739,24 +698,11 @@ class Client {
             alert: async (body, heading) => {
               await showInGameAlert(body, { heading });
             },
-            tierName: (tier) => translateCosmetic("subscriptions", tier),
             navigate: (hash) => {
               window.location.hash = hash;
             },
             storeClaimPrompt: (store) =>
               localStorage.setItem(CLAIM_PROMPT_KEY, JSON.stringify(store)),
-            updateSteamGrant: (update) =>
-              localStorage.setItem(
-                STEAM_GRANT_NOTICE_KEY,
-                JSON.stringify(
-                  update(
-                    parseSteamGrantStore(
-                      localStorage.getItem(STEAM_GRANT_NOTICE_KEY),
-                    ),
-                  ),
-                ),
-              ),
-            markNoticeSeen: (notice) => void markNoticeSeen(notice),
             now: () => Date.now(),
           },
         );

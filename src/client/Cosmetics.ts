@@ -12,7 +12,6 @@ import {
 } from "@openfront/shared/WireSchemas";
 import { getApiBase, getUserMe } from "./Api";
 import { UserSettings } from "./UserSettings";
-import { translateText } from "./Utils";
 
 /**
  * Ceiling on the cosmetics catalog request. Matches the bound the auth calls
@@ -376,16 +375,4 @@ export async function getPlayerCosmetics(
   }
 
   return result;
-}
-
-export function translateCosmetic(prefix: string, name: string): string {
-  const translation = translateText(`${prefix}.${name}`);
-  if (translation.startsWith(prefix)) {
-    return name
-      .split("_")
-      .filter((word) => word.length > 0)
-      .map((word) => word[0].toUpperCase() + word.substring(1))
-      .join(" ");
-  }
-  return translation;
 }
