@@ -13,7 +13,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                     |
 | 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                     |
 | 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1` |
-| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a, 5b y 5c) | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`                           |
+| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a-5e)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082` |
 | 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                            |
 
 ### Cómo se verifica cada grupo
@@ -109,11 +109,39 @@ Pruebas manuales con `npm run dev` (Vite en 9000 y server en 3000/3001/3002):
   borrados. Sólo aparece el ruido esperado de `localhost:8787` que se documenta
   más abajo.
 
+### Resultado del Bloque 2 (5d y 5e)
+
+Dos corridas completas consecutivas: **6983 tests, 6901 pasados, 81 fallados y
+1 pending por corrida**. Los 81 nombres son idénticos en ambas corridas, están
+todos en `docs/baseline-failures.txt` y no apareció ningún nombre nuevo.
+Typecheck, lint y formato en 0.
+
+La suite bajó 107 tests contra el cierre del Bloque 1 (7090 → 6983). Se
+borraron 6 archivos de test completos (los de `LeaderboardModal`,
+`ApiPlayerLeaderboard`, `Matchmaking`, `RankedTrustLock`, `RankedModalTrust` y
+`WinModal`) y se podaron casos de `MainInitialize`, `GameServerApiCallers`,
+`PlayerProfilePage`, `PlayerProfileClansTab`, `ClanApiQueries` y `ServerList`;
+también se quitó el mock de leaderboard de `ClanModalTestUtils`. Se agregó
+cobertura para
+`match_cancelled` sin listener de requeue y para un `rankedType` viejo en
+`WinModal`.
+
+`leaderboard_modal.try_again` se conservó a propósito: lo usan
+`PlayerGameHistoryView`, `ClanGameHistoryView` y `ClanDonationsView`.
+
+Verificación de arranque: `npm run start:server-dev`, solo, levanta el master
+en `3000` y los workers en `3001`/`3002`; **no** abre un listener en `8787`.
+`http://localhost:3000/` responde `500` por el `static/index.html` ausente, no
+por el puerto. La misma corrida en un worktree de `main` dio el resultado
+idéntico. Los errores de `8787` son del API separado, que `npm run dev` tampoco
+inicia.
+
 ## Borrado obligatorio antes de cerrar la Fase 1
 
-Esta es la lista de supervivientes del Grupo 4 y de los restos del Grupo 3. La
-Fase 1 **no se cierra** hasta que quede vacía. Cada ítem indica el subgrupo que
-lo elimina; al borrarlo se marca la casilla y se tacha el nombre.
+Esta es la lista de supervivientes del Grupo 4, del Bloque 2 (5d y 5e) y de los
+restos del Grupo 3. La Fase 1 **no se cierra** hasta que quede vacía. Cada ítem
+indica el subgrupo que lo elimina; al borrarlo se marca la casilla y se tacha el
+nombre.
 
 ### 5a, 5b y 5c · Social, amigos y tribus pagas — hecho
 
@@ -124,6 +152,24 @@ lo elimina; al borrarlo se marca la casilla y se tacha el nombre.
 - [x] ~~Tribus pagas: `TribesPanel`, `TribeStatsView`,
       `LeaderboardTribeTable`, APIs y schemas~~ — `ccc006f55`
 - [x] ~~Claves de traducción huérfanas del recorte de tribus~~ — `b851ca0d6`
+
+### 5d y 5e · Leaderboards y ranked — hecho
+
+- [x] ~~`src/client/LeaderboardModal.ts`,
+      `components/leaderboard/LeaderboardPlayerList.ts` y
+      `LeaderboardClanTable.ts`~~ — `58c7fcddd`
+- [x] ~~`fetchPlayerLeaderboard`, `fetchClanLeaderboard` e
+      `isPageBoundsMessage`; tests de leaderboard~~ — `58c7fcddd`
+- [x] ~~Página, navegación, router y claves de leaderboard en `index.html`,
+      `Main.ts`, `LangSelector.ts`, `LazyModals.ts` y `en.json`~~ — `58c7fcddd`
+- [x] ~~`src/client/components/RankedModal.ts`, `src/client/Matchmaking.ts`,
+      tarjeta y botón ranked del selector de modos~~ — `204503082`
+- [x] ~~`WinModal.requeue`, `HeadsUpMessage` con `RankedType`,
+      `matchmaking-requeue`, `consumeRequeueUrl` y el wiring de `Main.ts`~~ —
+      `204503082`
+- [x] ~~`matchmakingSite`, contexto ranked de `TrustRequiredContext` y claves
+      `matchmaking_modal.*`, `mode_selector.ranked_*` y
+      `win_modal.requeue`~~ — `204503082`
 
 ### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
@@ -251,25 +297,25 @@ el juego debe arrancar igual. Hay que verificar también que una URL inexistente
 en Vercel no devuelva el `index.html`: un fallback SPA haría pasar un 404 por un
 catálogo válido.
 
-### Campos y schemas que sobreviven al Bloque 1
+### Campos y schemas que sobreviven a los Bloques 1 y 2
 
-Estos nombres no se tocaron en 5a-5c. La columna "estado" dice qué queda vivo
+Estos nombres no se tocaron en 5a-5e. La columna "estado" dice qué queda vivo
 hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
 
-| Nombre              | Dónde queda                                                                 | Estado después del Bloque 1                                                                 | Cuándo se va |
+| Nombre              | Dónde queda                                                                 | Estado después de los Bloques 1 y 2                                                         | Cuándo se va |
 | ------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
 | `friends`           | `WireSchemas`, `ApiSchemas`, `SharedUtil`, `engine-api`, snapshots          | Campo inerte en el cliente: la UI ya no lo lee. Sigue en el wire y en `TeamAssignment`.     | Fase 2       |
 | `GroupToken`        | `WireSchemas` (`GroupTokenEvent`, mensajes de lobby/start)                   | El cliente ya no lo emite ni lo consume; el evento y el schema siguen por el netcode.       | Fase 2       |
 | `tribeNames`        | `CosmeticSchemas`                                                           | Sin consumidores tras borrar la tienda de tribus. El schema queda para no tocar el contrato. | Fase 2       |
 | `lobbyQueue`        | `CosmeticSchemas`, `HostLobbyModal`                                         | Todavía vivo: el host muestra el precio de la cola paga (5g).                               | 5g y Fase 2  |
 | `clanTag`           | `engine-api`, `engine`, `WireSchemas`, `ApiSchemas`, cliente de clanes       | Todavía vivo para clanes (5f) y para el estado determinista del engine.                     | Fase 2       |
-| `RankedType`        | `engine-api`, `engine`, `ApiSchemas`, stats y leaderboard del cliente        | Todavía vivo para ranked (5e) y para el check de victoria del engine.                       | Fase 2       |
-| `ClanApiSchemas`    | `ClanApi.ts`, `LeaderboardClanTable`, `ClanStatsBreakdown`, `PrivilegeRefresher` | Todavía vivo para clanes (5f); `PrivilegeRefresher` lo usa en el server.                    | Fase 2       |
+| `RankedType`        | `engine-api`, `engine`, `ApiSchemas` y stats del cliente                     | Sin UI ni cola ranked en el cliente tras 5e; sigue para el check de victoria del engine.    | Fase 2       |
+| `ClanApiSchemas`    | `ClanApi.ts`, `ClanStatsBreakdown`, `PrivilegeRefresher`                     | Todavía vivo para clanes (5f); `PrivilegeRefresher` lo usa en el server.                    | Fase 2       |
 | `TeamAssignment`    | `engine-lib/src/game/TeamAssignment.ts`                                     | Agrupa por `clanTag` y `friends`; con ambos vacíos la agrupación queda inerte, pero se conserva. | Fase 2       |
 
 `TeamAssignment` se verifica en una partida por equipos contra bots: debe
 repartir equipos sin errores y sin leer `friends` (vacío) ni `clanTag` (null).
-Esa prueba se hace al cerrar 5e/5f, no en este bloque.
+Esa prueba queda para el cierre de 5f, no para el Bloque 2.
 
 ## Contratos del engine y del netcode
 
@@ -300,7 +346,8 @@ a cambiar `packages/engine`, y AGENTS.md prohíbe esa fase.
 **Por qué:** el check de victoria lee `rankedType` para anular partidas ranked.
 El enum vive en el engine-api.
 
-**Cuándo:** Fase 2. Mientras tanto, ningún lobby del cliente puede pedir ranked.
+**Cuándo:** Fase 2. Tras 5e el cliente ya no tiene cola ni UI ranked; el enum
+queda por el engine, el check de victoria y las estadísticas.
 
 ### `PlayerCosmetics` en `WireSchemas`
 
@@ -463,6 +510,28 @@ Abrí `http://localhost:9000`.
 5. **Traducciones.** La consola no muestra `Translation key not found` por
    `steam_grant.*` ni por `username.lapse_notice_after_*`.
 
+### Smoke test del Bloque 2 (5d y 5e)
+
+```
+npm run dev
+```
+
+Abrí `http://localhost:9000`.
+
+1. **Home.** El selector de modos no tiene la tarjeta "Ranked"; quedan Create y
+   Join en la grilla de acciones.
+2. **Navegación.** La barra de navegación no tiene "Leaderboard". Los deep links
+   `#modal=leaderboard` y `#modal=ranked` no abren nada, limpian el hash y no
+   lanzan excepciones.
+3. **Perfil.** Un perfil público no tiene "View leaderboard"; Back vuelve a la
+   home y no a una clasificación.
+4. **Partida contra bots.** Entrá a Single Player, elegí mapa y bots, y jugá
+   hasta que termine. El modal de victoria muestra Exit y Keep; no hay botón
+   Requeue ni aunque la configuración vieja traiga `rankedType`.
+5. **Consola.** No aparece `Failed to fetch dynamically imported module` por
+   `LeaderboardModal`, `RankedModal` ni `Matchmaking`. El ruido de `8787` sigue
+   siendo el documentado abajo.
+
 ### `window.adsEnabled`
 
 - Se eliminó la asignación en `Main.ts` junto con el resto de la publicidad.
@@ -474,12 +543,12 @@ Abrí `http://localhost:9000`.
 ## Ruido de consola esperado hasta Fase 2
 
 Con el cliente levantado y el API de `localhost:8787` apagado, la consola del
-navegador muestra errores que **no son regresiones**. Desaparecen cuando el
-server está arriba:
+navegador muestra errores que **no son regresiones**. Desaparecen cuando ese
+API está arriba:
 
-- **CORS / `Failed to fetch`** en `cluster.json`, `auth/refresh`,
-  `cosmetics.json`, `leaderboard/ranked` y `public/clans/leaderboard`. El
-  cliente los pide a `8787`; sin server, el navegador corta la petición.
+- **CORS / `Failed to fetch`** en `cluster.json`, `auth/refresh` y
+  `cosmetics.json`. El cliente los pide a `8787`; sin server, el navegador corta
+  la petición.
 - **`Server list API unreachable` / `Server list API still unreachable`**:
   `ServerList.ts` cae al fallback offline.
 - **`Lobby socket ... closed (1001/1006)`**: Vite proxya `/w1` a `8787`; sin
@@ -493,6 +562,11 @@ server está arriba:
 - **`SpawnExecution: cannot spawn Antarctica`**: el mapa World no encuentra
   tile de spawn para Antártida. Es una advertencia del engine, no un fallo de
   arranque.
+
+`start:server-dev` no levanta el API de `8787`: abre el game server en `3000`
+(con workers en `3001`/`3002`). Por eso los errores de API siguen apareciendo
+aunque ese comando esté corriendo. El `500` de `http://localhost:3000/` viene de
+que falta `static/index.html`, no de un puerto mal configurado.
 
 **Confirmación pre-Fase 1.** En un worktree de `main` (`6b9933ea6`) se verificó
 que ambos avisos ya existían: el iframe de `HelpModal.ts` con
