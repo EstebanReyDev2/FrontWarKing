@@ -7,14 +7,14 @@ se resuelve. Si algo de acá te sorprende, es porque está esperando su fase.
 
 Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 
-| Grupo                                                     | Estado              | Commit                                                                       |
-| --------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------- |
-| 1 · Publicidad, tracking y noticias                       | Hecho               | `45841321e`                                                                  |
-| 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                     |
-| 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                     |
-| 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1` |
-| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a-5e)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082` |
-| 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                            |
+| Grupo                                                     | Estado              | Commit                                                                                                 |
+| --------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1 · Publicidad, tracking y noticias                       | Hecho               | `45841321e`                                                                                            |
+| 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                                               |
+| 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                                               |
+| 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1`                           |
+| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a-5f)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082`, `fa8cfbf1b`, `5c6e243bc` |
+| 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                                                      |
 
 ### Cómo se verifica cada grupo
 
@@ -136,12 +136,46 @@ por el puerto. La misma corrida en un worktree de `main` dio el resultado
 idéntico. Los errores de `8787` son del API separado, que `npm run dev` tampoco
 inicia.
 
+### Resultado del Bloque 3 (5f-1 y 5f-2)
+
+Dos corridas completas consecutivas: **6.589 tests, 6.507 pasados, 81 fallados y
+1 skipped por corrida**. Los 81 nombres son idénticos en ambas corridas, están
+todos en `docs/baseline-failures.txt` y no apareció ningún nombre nuevo. Contra
+la línea base original faltan 6 nombres de cliente (`InventoryModal`,
+`PastGameXpCard` ×2, `ProfileCard`, `ProgressionModals` y `RewardTrack`) porque
+sus tests ya se habían borrado o podado en bloques anteriores; no son fallos
+nuevos. Typecheck, lint y formato en 0.
+
+`fa8cfbf1b` borró la UI de clanes (`ClanModal`, `ClanApi`, los 15 componentes de
+`components/clan`, el router, `LazyModals`, la navegación, `page-clan` y las
+claves `clan_modal.*`, `main.clans`, `account_modal.tab_clans` y
+`player_profile.no_clans`). Para que ese commit compilara, también se quitó de
+`UsernameInput` el chequeo de pertenencia a clan, que era el último consumidor
+de `ClanApi`; el selector siguió existiendo hasta 5f-2.
+
+`5c6e243bc` quitó el selector de clan tag de `UsernameInput` (`getClanTag`,
+`getClanCheck`, `clearClanTag`, eventos, `page-clan` y `localStorage.clanTag`),
+dejó el join con `clanTag: null` en `Main` y en single player, y eliminó
+`clanTagCheck` de `ClientGameRunner`. `ClanApiSchemas` se conserva porque
+`src/server/PrivilegeRefresher.ts` usa `ReservedClanTagsResponseSchema`.
+
+`ClientJoinMessageSchema` sigue exigiendo la clave `clanTag` (nullable). Un
+mensaje con `clanTag: null` es válido; uno sin la clave no lo es, y no se tocó
+`WireSchemas` porque está fuera del alcance. El cliente normaliza cualquier
+configuración sin tag a `null`, así que el camino real nunca omite la clave. La
+cobertura quedó en `tests/core/SpectatorJoinSchema.test.ts`,
+`tests/client/TransportSendPaths.test.ts`, `tests/client/UsernameInput.steam.test.ts`
+y `tests/TeamAssignment.test.ts`.
+
+La suite bajó 394 tests contra el cierre del Bloque 2 (6.983 → 6.589) por el
+borrado de los tests de la UI de clanes.
+
 ## Borrado obligatorio antes de cerrar la Fase 1
 
-Esta es la lista de supervivientes del Grupo 4, del Bloque 2 (5d y 5e) y de los
-restos del Grupo 3. La Fase 1 **no se cierra** hasta que quede vacía. Cada ítem
-indica el subgrupo que lo elimina; al borrarlo se marca la casilla y se tacha el
-nombre.
+Esta es la lista de supervivientes del Grupo 4, del Bloque 2 (5d y 5e), del
+Bloque 3 (5f) y de los restos del Grupo 3. La Fase 1 **no se cierra** hasta que
+quede vacía. Cada ítem indica el subgrupo que lo elimina; al borrarlo se marca la
+casilla y se tacha el nombre.
 
 ### 5a, 5b y 5c · Social, amigos y tribus pagas — hecho
 
@@ -170,6 +204,26 @@ nombre.
 - [x] ~~`matchmakingSite`, contexto ranked de `TrustRequiredContext` y claves
       `matchmaking_modal.*`, `mode_selector.ranked_*` y
       `win_modal.requeue`~~ — `204503082`
+
+### 5f · Clanes y selector de clan tag — hecho
+
+- [x] ~~`src/client/ClanModal.ts`, `src/client/ClanApi.ts` y los 15 componentes
+      de `src/client/components/clan/`~~ — `fa8cfbf1b`
+- [x] ~~Entrada `clan-modal` de `LazyModals`, registro `clan` del router y
+      `closeMenu` de `Main`; botones `page-clan` de `DesktopNavBar`/`MobileNavBar`;
+      `<clan-modal id="page-clan">` de `index.html`~~ — `fa8cfbf1b`
+- [x] ~~Tabs y orígenes de clanes en `PlayerProfileModal`, `GameStatsModal`,
+      `AccountModal` y sus tests~~ — `fa8cfbf1b`
+- [x] ~~Claves `clan_modal.*`, `main.clans`, `account_modal.tab_clans` y
+      `player_profile.no_clans` de `en.json`~~ — `fa8cfbf1b`
+- [x] ~~Selector de clan tag, `getClanTag`, `getClanCheck`, `clearClanTag`,
+      eventos de clan y `localStorage.clanTag` en `UsernameInput`~~ — `5c6e243bc`
+- [x] ~~`playerClanTag` de `Main` y `clanTagCheck` de `ClientGameRunner`; el join
+      ahora manda `clanTag: null`~~ — `5c6e243bc`
+- [x] ~~Claves `username.clan_*`, `username.tag` y `username.tag_not_member` de
+      `en.json`; regla `#clan-tag-menu` de `halloween.css`~~ — `5c6e243bc`.
+      Se conservan `username.tag_too_short`, `tag_too_long` y
+      `tag_invalid_chars` porque `validateClanTag` sigue existiendo.
 
 ### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
@@ -276,11 +330,25 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 
 ### Restos que no son de este grupo
 
-- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5 (clanes)
-- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5 (host y cola paga)
+- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5 (lo usa `AccountModal`)
+- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5g (host y cola paga)
 - [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder` — Grupo 6
 
 ## Deuda para Fase 2
+
+### API de `8787`
+
+El API de `localhost:8787` **no está en el repositorio**: `npm run dev` sólo
+levanta Vite y el game server. Toda llamada del cliente a sesión/auth
+(`auth/refresh`, JWT), `cosmetics.json`, `cluster.json`, historial de partidas y
+stats tiene que reemplazarse por Supabase, stubearse o eliminarse en Fase 2.
+Mientras tanto, esos pedidos fallan y son parte del ruido de consola esperado.
+
+No es posible hacer una verificación real de cosméticos en local: no hay backend
+que sirva el catálogo ni el inventario del jugador. La única verificación local
+posible es que el cliente arranque con el catálogo vacío o el fallback y que el
+render no dependa de cosméticos comprados. La validación con cosméticos reales
+queda para un entorno con backend o para cuando Supabase tenga el catálogo.
 
 El catálogo de cosméticos todavía depende del servidor original. `fetchCosmetics`,
 `getPlayerCosmeticsRefs` y `cosmeticsJsonUrl` en `src/client/Cosmetics.ts`, más
@@ -297,31 +365,31 @@ el juego debe arrancar igual. Hay que verificar también que una URL inexistente
 en Vercel no devuelva el `index.html`: un fallback SPA haría pasar un 404 por un
 catálogo válido.
 
-### Campos y schemas que sobreviven a los Bloques 1 y 2
+### Campos y schemas que sobreviven a los Bloques 1, 2 y 3
 
-Estos nombres no se tocaron en 5a-5e. La columna "estado" dice qué queda vivo
+Estos nombres no se tocaron en 5a-5f. La columna "estado" dice qué queda vivo
 hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
 
-| Nombre              | Dónde queda                                                                 | Estado después de los Bloques 1 y 2                                                         | Cuándo se va |
-| ------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
-| `friends`           | `WireSchemas`, `ApiSchemas`, `SharedUtil`, `engine-api`, snapshots          | Campo inerte en el cliente: la UI ya no lo lee. Sigue en el wire y en `TeamAssignment`.     | Fase 2       |
-| `GroupToken`        | `WireSchemas` (`GroupTokenEvent`, mensajes de lobby/start)                   | El cliente ya no lo emite ni lo consume; el evento y el schema siguen por el netcode.       | Fase 2       |
-| `tribeNames`        | `CosmeticSchemas`                                                           | Sin consumidores tras borrar la tienda de tribus. El schema queda para no tocar el contrato. | Fase 2       |
-| `lobbyQueue`        | `CosmeticSchemas`, `HostLobbyModal`                                         | Todavía vivo: el host muestra el precio de la cola paga (5g).                               | 5g y Fase 2  |
-| `clanTag`           | `engine-api`, `engine`, `WireSchemas`, `ApiSchemas`, cliente de clanes       | Todavía vivo para clanes (5f) y para el estado determinista del engine.                     | Fase 2       |
-| `RankedType`        | `engine-api`, `engine`, `ApiSchemas` y stats del cliente                     | Sin UI ni cola ranked en el cliente tras 5e; sigue para el check de victoria del engine.    | Fase 2       |
-| `ClanApiSchemas`    | `ClanApi.ts`, `ClanStatsBreakdown`, `PrivilegeRefresher`                     | Todavía vivo para clanes (5f); `PrivilegeRefresher` lo usa en el server.                    | Fase 2       |
-| `TeamAssignment`    | `engine-lib/src/game/TeamAssignment.ts`                                     | Agrupa por `clanTag` y `friends`; con ambos vacíos la agrupación queda inerte, pero se conserva. | Fase 2       |
+| Nombre           | Dónde queda                                                               | Estado después de los Bloques 1, 2 y 3                                                           | Cuándo se va |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------ |
+| `friends`        | `WireSchemas`, `ApiSchemas`, `SharedUtil`, `engine-api`, snapshots        | Campo inerte en el cliente: la UI ya no lo lee. Sigue en el wire y en `TeamAssignment`.          | Fase 2       |
+| `GroupToken`     | `WireSchemas` (`GroupTokenEvent`, mensajes de lobby/start)                | El cliente ya no lo emite ni lo consume; el evento y el schema siguen por el netcode.            | Fase 2       |
+| `tribeNames`     | `CosmeticSchemas`                                                         | Sin consumidores tras borrar la tienda de tribus. El schema queda para no tocar el contrato.     | Fase 2       |
+| `lobbyQueue`     | `CosmeticSchemas`, `HostLobbyModal`                                       | Todavía vivo: el host muestra el precio de la cola paga (5g).                                    | 5g y Fase 2  |
+| `clanTag`        | `engine-api`, `engine`, `WireSchemas`, `ApiSchemas` y estado determinista | El cliente ya no lo lee de `localStorage` ni envía uno propio: el join manda `null`.             | Fase 2       |
+| `RankedType`     | `engine-api`, `engine`, `ApiSchemas` y stats del cliente                  | Sin UI ni cola ranked en el cliente tras 5e; sigue para el check de victoria del engine.         | Fase 2       |
+| `ClanApiSchemas` | `src/server/PrivilegeRefresher.ts`                                        | Sólo `ReservedClanTagsResponseSchema`; el resto queda inerte.                                    | Fase 2       |
+| `TeamAssignment` | `engine-lib/src/game/TeamAssignment.ts`                                   | Agrupa por `clanTag` y `friends`; con ambos vacíos la agrupación queda inerte, pero se conserva. | Fase 2       |
 
-`TeamAssignment` se verifica en una partida por equipos contra bots: debe
-repartir equipos sin errores y sin leer `friends` (vacío) ni `clanTag` (null).
-Esa prueba queda para el cierre de 5f, no para el Bloque 2.
+`TeamAssignment` quedó cubierto por `tests/TeamAssignment.test.ts` con todos los
+`clanTag` en `null` y `friends` vacío, y se prueba además en la partida por
+equipos contra bots del smoke test del Bloque 3.
 
 ## Contratos del engine y del netcode
 
 ### `clanTag` en el contrato del engine
 
-Los clanes desaparecen del cliente (Grupo 5), pero `clanTag` sigue viajando en
+Los clanes desaparecieron del cliente en 5f, pero `clanTag` sigue viajando en
 el estado del juego:
 
 - `packages/engine-api/src/game/GameTypes.ts` — `public readonly clanTag`
@@ -532,6 +600,34 @@ Abrí `http://localhost:9000`.
    `LeaderboardModal`, `RankedModal` ni `Matchmaking`. El ruido de `8787` sigue
    siendo el documentado abajo.
 
+### Smoke test del Bloque 3 (5f)
+
+```
+npm run dev
+```
+
+Abrí `http://localhost:9000`.
+
+1. **Navegación.** No hay botón ni entrada "Clans" en desktop ni mobile;
+   `#modal=clan` no abre nada, limpia el hash y no lanza excepciones.
+2. **Home.** El campo de nombre no tiene selector de clan tag ni
+   `#clan-tag-menu`; el join no manda un tag.
+3. **`localStorage` viejo.** Con `localStorage.clanTag` guardado de una versión
+   anterior, la home carga, el nombre se puede editar y el join funciona; el
+   valor viejo no se lee.
+4. **Partida por equipos.** Single Player → Teams → bots → jugá hasta que
+   termine. Los equipos se reparten sin errores y el juego termina.
+5. **Perfil y stats.** El perfil y el modal de stats no tienen tabs ni links de
+   clanes; Back no intenta volver a un clan.
+6. **Consola.** No aparece `Translation key not found` por claves de clan, ni
+   `Failed to fetch dynamically imported module` por `ClanModal` o
+   `components/clan`. El ruido de `8787` sigue siendo el documentado abajo.
+
+Resultado de la prueba real (26/10/2026): partida **Teams** en Pangaea compacto
+(500×500), 3 bots, dificultad Easy, jugada en Chromium headless hasta el final.
+El humano quedó en el equipo Red y ganó en el tick 1116 con todos los enemigos
+eliminados; no hubo errores de equipos ni de clanes en la partida.
+
 ### `window.adsEnabled`
 
 - Se eliminó la asignación en `Main.ts` junto con el resto de la publicidad.
@@ -613,13 +709,12 @@ consumidor, así que no quedaba nada que la leyera.
 - `src/client/components/InsufficientCurrencyDialog.ts`
 
 **Por qué:** son UI de economía interna (plutonio/caps), no checkout.
-`CurrencyDisplay` lo usan `AccountModal`, `ClanModal` y cuatro componentes de
-clan (Grupo 5); `InsufficientCurrencyDialog` lo usa `HostLobbyModal` para la
-cola paga (Grupo 5g). Borrarlos en el Grupo 3 obliga a tocar clanes y el
-hosting en la misma tarea. El diálogo quedó dismiss-only: ya no enlaza a una
-tienda que no existe.
+`CurrencyDisplay` lo usa `AccountModal`; `InsufficientCurrencyDialog` lo usa
+`HostLobbyModal` para la cola paga (5g). Borrarlos en el Grupo 3 obliga a tocar
+la cuenta y el hosting en la misma tarea. El diálogo quedó dismiss-only: ya no
+enlaza a una tienda que no existe.
 
-**Cuándo:** Grupo 5, con la economía de clanes y la cola paga.
+**Cuándo:** 5g y Fase 2, con la cola paga y el recorte de cuenta.
 
 ## Terceros que se quedan
 
