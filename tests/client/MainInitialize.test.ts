@@ -115,6 +115,8 @@ function userMeFixture(): unknown {
 describe("Client.initialize() booted from Main.ts module scope", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   let logSpy: ReturnType<typeof vi.spyOn>;
+  let storageGetSpy: ReturnType<typeof vi.spyOn>;
+  let storageSetSpy: ReturnType<typeof vi.spyOn>;
 
   beforeAll(async () => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -211,6 +213,12 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
       "achievements.pushed",
       JSON.stringify({ playerId: "p1", names: ["win_ffa"] }),
     );
+    // Keys from the removed store and purchase-nudge flows. They can still be
+    // in a player's browser, so boot must not consult or rewrite them.
+    localStorage.setItem("storeSeenHash", "old-hash");
+    localStorage.setItem("purchaseNudgeShown", "1");
+    storageGetSpy = vi.spyOn(Storage.prototype, "getItem");
+    storageSetSpy = vi.spyOn(Storage.prototype, "setItem");
 
     // The import runs bootstrap: component registration, element upgrades,
     // then `new Client().initialize()`.
@@ -232,6 +240,8 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
   // as an unhandled error that fails the whole run.
   afterAll(async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
+    storageGetSpy.mockRestore();
+    storageSetSpy.mockRestore();
   });
 
   it("runs the signed-out boot: onUserMe(false) and the missing-version warn", () => {
@@ -241,6 +251,16 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
 
   it("clears the stale achievements.pushed record", () => {
     expect(localStorage.getItem("achievements.pushed")).toBeNull();
+  });
+
+  it("does not read or rewrite the removed store and purchase-nudge keys", () => {
+    for (const key of ["storeSeenHash", "purchaseNudgeShown"]) {
+      expect(storageGetSpy).not.toHaveBeenCalledWith(key);
+      expect(storageSetSpy).not.toHaveBeenCalledWith(
+        key,
+        expect.anything(),
+      );
+    }
   });
 
   it("starts the menu audio once its chunk loads", async () => {

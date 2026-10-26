@@ -12,11 +12,7 @@ import {
 } from "@openfront/engine-api/Schemas";
 import { DoomsdayClockSpeed } from "@openfront/engine-lib/game/DoomsdayClock";
 import { EventBus } from "@openfront/shared/EventBus";
-import {
-  ClientInfo,
-  LOBBY_QUEUE_CUTOFF_MS,
-  LobbyInfoEvent,
-} from "@openfront/shared/WireSchemas";
+import { ClientInfo, LobbyInfoEvent } from "@openfront/shared/WireSchemas";
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { ClientEnv } from "src/client/ClientEnv";
@@ -27,21 +23,18 @@ import {
   showToast,
   translateText,
 } from "../client/Utils";
-import { createLobby, getUserMe, queueLobby, setLobbyListed } from "./Api";
+import { createLobby, setLobbyListed } from "./Api";
 import "./components/baseComponents/Modal";
 import { BaseModal } from "./components/BaseModal";
 import "./components/ConfirmDialog";
 import { CopyButton } from "./components/CopyButton";
 import "./components/GameConfigSettings";
 import "./components/InputCard";
-import "./components/InsufficientCurrencyDialog";
 import "./components/ListLobbyDialog";
 import { ListLobbyOptions } from "./components/ListLobbyDialog";
 import "./components/LobbyPlayerView";
-import "./components/PlutoniumIcon";
 import "./components/ToggleInputCard";
 import { modalHeader } from "./components/ui/ModalHeader";
-import { fetchCosmetics, InsufficientCurrency } from "./Cosmetics";
 import { gamePortal } from "./GamePortal";
 import { JoinLobbyEvent } from "./Main";
 import { terrainMapFileLoader } from "./TerrainMapFileLoader";
@@ -120,14 +113,6 @@ export class HostLobbyModal extends BaseModal {
   @state() private showListLobbyDialog: boolean = false;
   // Server timestamp when the listed lobby auto-starts (from lobby info).
   @state() private autoStartAt: number | null = null;
-  // The host paid to put the listed lobby in the public Special queue.
-  @state() private queued: boolean = false;
-  // Queue price from cosmetics.json; the Queue button hides without it.
-  @state() private queuePriceHard: number | null = null;
-  @state() private queueRequestInFlight: boolean = false;
-  @state() private showQueueConfirm: boolean = false;
-  @state() private insufficientInfo: InsufficientCurrency | null = null;
-  private hardBalance = 0;
 
   @property({ attribute: false }) eventBus: EventBus | null = null;
   // Timers for debouncing slider changes
@@ -181,7 +166,6 @@ export class HostLobbyModal extends BaseModal {
       this.publiclyListed = lobby.listed;
     }
     this.autoStartAt = lobby.autoStartAt ?? null;
-    this.queued = lobby.queued ?? false;
   };
 
   private getRandomString(): string {
@@ -291,68 +275,8 @@ export class HostLobbyModal extends BaseModal {
           : segment("host_modal.visibility_private", false)}
         ${segment("host_modal.visibility_public", true)}
       </div>
-      ${this.renderAutoStartTimer()} ${this.renderQueueButton()}
+      ${this.renderAutoStartTimer()}
     `;
-  }
-
-  // Listed lobbies only: pay plutonium to put the lobby in the public
-  // Special queue, right behind the lobby that's counting down.
-  private renderQueueButton() {
-    if (!this.publiclyListed) return nothing;
-    if (this.queued) {
-      return html`<span
-        class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full bg-green-500/15 text-green-400 border border-green-500/30 shrink-0"
-        >${translateText("host_modal.queued")}</span
-      >`;
-    }
-    // Gone once the lobby is starting or about to auto-start, so the host
-    // can't pay for a spot it starts before reaching (the server refuses
-    // too).
-    if (
-      this.queuePriceHard === null ||
-      this.lobbyStartAt !== null ||
-      (this.autoStartAt !== null &&
-        getSecondsUntilServerTimestamp(
-          this.autoStartAt,
-          this.serverTimeOffset,
-        ) *
-          1000 <
-          LOBBY_QUEUE_CUTOFF_MS)
-    ) {
-      return nothing;
-    }
-    return html`<button
-      class="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 transition-all shrink-0 disabled:opacity-50"
-      title=${translateText("host_modal.queue_tooltip")}
-      ?disabled=${this.queueRequestInFlight}
-      @click=${() => (this.showQueueConfirm = true)}
-    >
-      ${translateText("host_modal.queue")}
-      <plutonium-icon .size=${12}></plutonium-icon>
-      <span class="tabular-nums">${this.queuePriceHard}</span>
-    </button>`;
-  }
-
-  private async handleQueue() {
-    const price = this.queuePriceHard;
-    if (this.queueRequestInFlight || price === null || !this.lobbyId) return;
-    this.queueRequestInFlight = true;
-    const result = await queueLobby(this.lobbyId);
-    this.queueRequestInFlight = false;
-    if (result.ok) {
-      this.queued = true;
-      return;
-    }
-    if (result.error === "insufficient_balance") {
-      this.insufficientInfo = {
-        currency: translateText("cosmetics.hard"),
-        shortfall: Math.max(1, price - this.hardBalance),
-        item: translateText("host_modal.queue_item"),
-        canTopUp: true,
-      };
-      return;
-    }
-    showToast(translateText("host_modal.queue_failed"), "red", 3000);
   }
 
   // Countdown until the listed lobby starts automatically (hosts can't sit
@@ -393,6 +317,12 @@ export class HostLobbyModal extends BaseModal {
     void this.handlePublicListingToggle(isPublic);
   }
 
+  // The host needs a second seated player before starting, unless a start
+  // countdown is already running.
+  private get startDisabled(): boolean {
+    return this.lobbyStartAt === null && this.clients.length < 2;
+  }
+
   protected renderBody() {
     const secondsRemaining =
       this.lobbyStartAt !== null
@@ -403,17 +333,12 @@ export class HostLobbyModal extends BaseModal {
         : null;
     const statusLabel =
       secondsRemaining === null
-        ? this.queued
-          ? translateText("host_modal.queued_waiting")
-          : this.clients.length === 1
-            ? translateText("host_modal.waiting")
-            : translateText("game_settings.start")
-        : // A queued lobby's countdown belongs to the public queue; the host
-          // can't cancel it.
-          translateText(
-            this.queued ? "public_lobby.starting_in" : "host_modal.starting_in",
-            { time: renderDuration(secondsRemaining) },
-          );
+        ? this.clients.length === 1
+          ? translateText("host_modal.waiting")
+          : translateText("game_settings.start")
+        : translateText("host_modal.starting_in", {
+            time: renderDuration(secondsRemaining),
+          });
 
     const inputCards = [
       html`<toggle-input-card
@@ -760,8 +685,7 @@ export class HostLobbyModal extends BaseModal {
             size="lg"
             .title=${statusLabel}
             .uppercase=${secondsRemaining === null}
-            ?disable=${this.queued ||
-            (this.lobbyStartAt === null && this.clients.length < 2)}
+            ?disable=${this.startDisabled}
             @click=${this.toggleGameStartTimer}
           ></o-button>
         </div>
@@ -779,25 +703,6 @@ export class HostLobbyModal extends BaseModal {
               }}
             ></list-lobby-dialog>`
           : ""}
-        ${this.showQueueConfirm && this.queuePriceHard !== null
-          ? html`<confirm-dialog
-              .heading=${translateText("host_modal.queue_confirm_title")}
-              .message=${translateText("host_modal.queue_confirm_body", {
-                price: this.queuePriceHard,
-              })}
-              variant="warning"
-              .confirmText=${translateText("host_modal.queue_confirm")}
-              @cancel=${() => (this.showQueueConfirm = false)}
-              @confirm=${() => {
-                this.showQueueConfirm = false;
-                void this.handleQueue();
-              }}
-            ></confirm-dialog>`
-          : ""}
-        <insufficient-currency-dialog
-          .info=${this.insufficientInfo}
-          @close=${() => (this.insufficientInfo = null)}
-        ></insufficient-currency-dialog>
       </div>
     `;
   }
@@ -809,13 +714,6 @@ export class HostLobbyModal extends BaseModal {
     // can re-arm it and disconnect the host mid game-start.
     this.leaveLobbyOnClose = true;
     this.startLobbyUpdates();
-    void getUserMe().then((userMe) => {
-      this.hardBalance =
-        userMe === false ? 0 : (userMe.player.currency?.hard ?? 0);
-    });
-    void fetchCosmetics().then((cosmetics) => {
-      this.queuePriceHard = cosmetics?.lobbyQueue?.priceHard ?? null;
-    });
 
     // Attach mode: the server already minted this successor lobby with us as
     // creator (win-screen "New lobby" flow), so bind to the existing id instead
@@ -1004,10 +902,6 @@ export class HostLobbyModal extends BaseModal {
     this.hostCheatStartingGoldValue = undefined;
     this.publiclyListed = false;
     this.showListLobbyDialog = false;
-    this.queued = false;
-    this.queueRequestInFlight = false;
-    this.showQueueConfirm = false;
-    this.insufficientInfo = null;
     this.autoStartAt = null;
   }
 

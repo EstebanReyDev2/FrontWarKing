@@ -362,7 +362,6 @@
     "traitor_neighbor_info": "You can betray traitors without becoming a traitor yourself."
   },
   "cosmetics": {
-    "hard": "Plutonium",
     "type_flag": "Flag"
   },
   "desktop_gate": {
@@ -887,15 +886,6 @@
     "player_whitelist": "Player Whitelist (public IDs)",
     "player_whitelist_placeholder": "comma separated",
     "players": "Players",
-    "queue": "Queue",
-    "queue_confirm": "Pay and queue",
-    "queue_confirm_body": "Pay {price} Plutonium to send this lobby to the public queue? It will start right after the lobby that is counting down.",
-    "queue_confirm_title": "Send to the public queue?",
-    "queue_failed": "Could not queue the lobby. Try again; you won't be charged twice.",
-    "queue_item": "a spot in the public queue",
-    "queue_tooltip": "Put this lobby in the public Special queue, right behind the lobby that is about to start",
-    "queued": "Queued",
-    "queued_waiting": "In the public queue",
     "remove_player": "Remove {username}",
     "settings_locked_listed": "This lobby is publicly listed, so its settings can no longer be changed.",
     "spectator": "Spectator",
@@ -1558,10 +1548,6 @@
   "steam_user_header": {
     "avatar_alt": "Steam avatar",
     "default_name": "Steam player"
-  },
-  "store": {
-    "insufficient_currency_body": "You need {amount, number} more {currency} to buy {item}.",
-    "insufficient_currency_title": "Insufficient {currency}"
   },
   "team_colors": {
     "blue": "Blue",

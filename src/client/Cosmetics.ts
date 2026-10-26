@@ -36,18 +36,6 @@ export function getCachedCosmetics(): Cosmetics | null {
   return __cosmeticsCache;
 }
 
-/** Shape of an unaffordable purchase, as returned by the API. */
-export interface InsufficientCurrency {
-  /** Display name of the currency, e.g. "Plutonium". */
-  currency: string;
-  /** How much more currency is needed (raw; localized in the dialog text). */
-  shortfall: number;
-  /** Display name of the item being bought. */
-  item: string;
-  /** Whether the currency can be topped up (hard currency only). */
-  canTopUp: boolean;
-}
-
 /**
  * Drops the cached cosmetics.json so the next fetchCosmetics() goes to the
  * network.
