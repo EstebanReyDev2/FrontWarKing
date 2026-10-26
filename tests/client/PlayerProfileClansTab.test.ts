@@ -81,8 +81,7 @@ describe("Player profile Clans tab", () => {
   let playPage: HTMLElement;
   let clanOpenArgs: Record<string, unknown> | undefined;
   let clanOpenCalls: number;
-  let leaderboardModal: HTMLElement;
-  let leaderboardOpenCalls: number;
+  let clanReturnCalls: number;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -90,6 +89,7 @@ describe("Player profile Clans tab", () => {
     profileFails = false;
     clanOpenArgs = undefined;
     clanOpenCalls = 0;
+    clanReturnCalls = 0;
     history.replaceState(null, "", "/");
 
     playPage = document.createElement("div");
@@ -115,14 +115,12 @@ describe("Player profile Clans tab", () => {
         // The real modal switches pages, closing this one.
         window.showPage?.("page-clan");
       };
-    document.body.appendChild(clanModal);
-
-    leaderboardOpenCalls = 0;
-    leaderboardModal = document.createElement("leaderboard-modal");
-    (leaderboardModal as HTMLElement & { open: unknown }).open = () => {
-      leaderboardOpenCalls++;
+    (
+      clanModal as HTMLElement & { returnFromPlayerProfile: unknown }
+    ).returnFromPlayerProfile = () => {
+      clanReturnCalls++;
     };
-    document.body.appendChild(leaderboardModal);
+    document.body.appendChild(clanModal);
 
     modal = document.createElement(
       "player-profile-modal",
@@ -138,7 +136,6 @@ describe("Player profile Clans tab", () => {
     window.showPage?.("page-play");
     modal.remove();
     clanModal.remove();
-    leaderboardModal.remove();
     playPage.remove();
     history.replaceState(null, "", "/");
   });
@@ -242,13 +239,13 @@ describe("Player profile Clans tab", () => {
       },
     ];
 
-    modal.openFromLeaderboard("nmTH13FD");
+    modal.openFromClan("nmTH13FD");
     await selectClan();
 
     expect(clanOpenArgs).toEqual({
       tag: "ALP",
       publicId: "nmTH13FD",
-      origin: "leaderboard",
+      origin: "clan",
     });
   });
 
@@ -308,15 +305,15 @@ describe("Player profile Clans tab", () => {
       },
     ];
 
-    // Opened from the leaderboard, so Back must still return there.
-    modal.openFromLeaderboard("nmTH13FD");
+    // Opened from a clan, so Back must still return there.
+    modal.openFromClan("nmTH13FD");
     await selectClan();
 
     // A member's profile reuses this element and overwrites its origin.
     modal.openFromClan("otherPlayer");
     await modal.updateComplete;
 
-    modal.returnFromClan("nmTH13FD", "leaderboard");
+    modal.returnFromClan("nmTH13FD", "clan");
     await waitForModal(modal, () => {
       expect(modal.querySelectorAll("clan-card")).toHaveLength(1);
     });
@@ -326,7 +323,7 @@ describe("Player profile Clans tab", () => {
     ) as HTMLButtonElement;
     backButton.click();
 
-    expect(leaderboardOpenCalls).toBe(1);
+    expect(clanReturnCalls).toBe(1);
   });
 
   it("keeps the profile's own origin across a nested clan detour", async () => {
@@ -340,8 +337,8 @@ describe("Player profile Clans tab", () => {
       },
     ];
 
-    // leaderboard → P → clan B → member Q → Q's own clan C → Back ×3.
-    modal.openFromLeaderboard("player-P");
+    // clan A → P → clan B → member Q → Q's own clan C → Back ×3.
+    modal.openFromClan("player-P");
     await selectClan();
     modal.openFromClan("player-Q");
     await selectClan();
@@ -354,7 +351,7 @@ describe("Player profile Clans tab", () => {
     // C's Back lands on Q, then Q's Back lands on B, whose Back lands here.
     modal.returnFromClan("player-Q", "clan");
     await modal.updateComplete;
-    modal.returnFromClan("player-P", "leaderboard");
+    modal.returnFromClan("player-P", "clan");
     await waitForModal(modal, () => {
       expect(modal.querySelectorAll("clan-card")).toHaveLength(1);
     });
@@ -364,7 +361,7 @@ describe("Player profile Clans tab", () => {
     ) as HTMLButtonElement;
     backButton.click();
 
-    expect(leaderboardOpenCalls).toBe(1);
+    expect(clanReturnCalls).toBe(1);
   });
 
   it("shows an empty state when the API omits clans (older backend)", async () => {

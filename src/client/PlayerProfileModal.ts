@@ -20,7 +20,6 @@ import { modalHeader } from "./components/ui/ModalHeader";
 import { usernameText } from "./components/ui/UsernameText";
 import { verifiedBadge } from "./components/ui/VerifiedBadge";
 import "./GameStatsModal";
-import "./LeaderboardModal";
 import { modalRouter } from "./ModalRouter";
 import {
   parsePlayerProfilePath,
@@ -31,7 +30,7 @@ import { currentPagePath, translateText } from "./Utils";
 export { playerProfileUrl };
 
 /** Where a profile was opened from, i.e. where its Back button leads. */
-export type ProfileOrigin = "clan" | "leaderboard";
+export type ProfileOrigin = "clan";
 
 @customElement("player-profile-modal")
 export class PlayerProfileModal extends BaseModal {
@@ -294,13 +293,6 @@ export class PlayerProfileModal extends BaseModal {
             data-action="play"
             @click=${() => this.goHome()}
           ></o-button>
-          <o-button
-            variant="secondary"
-            size="md"
-            translationKey="player_profile.view_leaderboard"
-            data-action="leaderboard"
-            @click=${() => this.openLeaderboard()}
-          ></o-button>
         </div>
       </div>
     `;
@@ -309,13 +301,6 @@ export class PlayerProfileModal extends BaseModal {
   // Close the profile onto the home page (the URL follows: see ModalRouter).
   private goHome(): void {
     this.close();
-  }
-
-  private openLeaderboard(): void {
-    this.close();
-    document
-      .querySelector<HTMLElement & { open(): void }>("leaderboard-modal")
-      ?.open();
   }
 
   // Opening another player's profile over this one: BaseModal syncs the URL
@@ -449,11 +434,6 @@ export class PlayerProfileModal extends BaseModal {
     this.openedFrom = "clan";
   }
 
-  public openFromLeaderboard(publicId: string): void {
-    this.open({ publicID: publicId });
-    this.openedFrom = "leaderboard";
-  }
-
   private back(): void {
     const openedFrom = this.openedFrom;
     this.close();
@@ -463,10 +443,6 @@ export class PlayerProfileModal extends BaseModal {
           "clan-modal",
         )
         ?.returnFromPlayerProfile();
-    } else if (openedFrom === "leaderboard") {
-      document
-        .querySelector<HTMLElement & { open(): void }>("leaderboard-modal")
-        ?.open();
     }
   }
 }

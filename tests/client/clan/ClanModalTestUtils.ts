@@ -61,7 +61,6 @@ export function clanApiMockFactory() {
     approveClanRequest: vi.fn(async () => true),
     denyClanRequest: vi.fn(),
     withdrawClanRequest: vi.fn(),
-    fetchClanLeaderboard: vi.fn(),
     banClanMember: vi.fn(async () => true),
     unbanClanMember: vi.fn(async () => true),
     fetchClanBans: vi.fn(async () => ({

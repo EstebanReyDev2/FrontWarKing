@@ -20,8 +20,6 @@ import {
   PutCreatorResponseSchema,
   PutUsernameResponse,
   PutUsernameResponseSchema,
-  RankedLeaderboardResponse,
-  RankedLeaderboardResponseSchema,
   SteamFinalizeResponseSchema,
   SteamOrderResolution,
   UserMeResponse,
@@ -1452,62 +1450,6 @@ export async function fetchGameById(
     return parsed.data;
   } catch (err) {
     console.warn("fetchGameById: request failed", err);
-    return false;
-  }
-}
-
-// The API answers a page past the end of the ranked leaderboard with a 400
-// instead of an empty list, so the end is only detectable from the error body.
-// Its wording is part of the contract; the bounds vary with the page cap.
-const PAGE_BOUNDS_MESSAGE = /^Page must be between \d+ and \d+$/;
-
-export function isPageBoundsMessage(body: unknown): boolean {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "message" in body &&
-    typeof body.message === "string" &&
-    PAGE_BOUNDS_MESSAGE.test(body.message)
-  );
-}
-
-export async function fetchPlayerLeaderboard(
-  page: number,
-): Promise<RankedLeaderboardResponse | "reached_limit" | false> {
-  try {
-    const url = new URL(`${getApiBase()}/leaderboard/ranked`);
-    url.searchParams.set("page", String(page));
-    const res = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!res.ok) {
-      if (res.status === 400) {
-        const body = await res.json().catch(() => null);
-        if (isPageBoundsMessage(body)) {
-          return "reached_limit";
-        }
-      }
-      console.warn(
-        "fetchPlayerLeaderboard: unexpected status",
-        res.status,
-        res.statusText,
-      );
-      return false;
-    }
-
-    const parsed = RankedLeaderboardResponseSchema.safeParse(await res.json());
-    if (!parsed.success) {
-      console.warn(
-        "fetchPlayerLeaderboard: Zod validation failed",
-        parsed.error.toString(),
-      );
-      return false;
-    }
-
-    return parsed.data;
-  } catch (err) {
-    console.error("fetchPlayerLeaderboard: request failed", err);
     return false;
   }
 }

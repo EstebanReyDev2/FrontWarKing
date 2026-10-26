@@ -1187,29 +1187,7 @@
     "warships": "Warships"
   },
   "leaderboard_modal": {
-    "clan": "Clan",
-    "clans_tab": "Clans",
-    "elo": "ELO",
-    "error": "Error loading leaderboard",
-    "games": "Games",
-    "loss_score": "Loss Score",
-    "loss_score_tooltip": "Weighted losses based on clan participation and match difficulty",
-    "no_data_yet": "No Data Yet",
-    "no_stats": "No stats available",
-    "player": "Player",
-    "rank": "Rank",
-    "ranked_2v2_tab": "2v2 Ranked",
-    "ranked_ffa_tab": "FFA Ranked",
-    "ranked_no_stats": "No ranked games have been played on this ladder yet",
-    "ranked_tab": "1v1 Ranked",
-    "ratio": "Ratio",
-    "refresh_time": "Refreshed every 1 hour",
-    "title": "Leaderboard",
-    "try_again": "Try Again",
-    "win_loss_ratio": "Win/Loss",
-    "win_score": "Win Score",
-    "win_score_tooltip": "Weighted wins based on clan participation and match difficulty",
-    "your_ranking": "Your Ranking"
+    "try_again": "Try Again"
   },
   "main": {
     "account": "Account",
@@ -1221,7 +1199,6 @@
     "go_to_troubleshooting": "Go to our troubleshooting page",
     "help": "Help",
     "join": "Join Lobby",
-    "leaderboard": "Leaderboard",
     "login_discord": "Login with Discord",
     "login_google": "Login with Google",
     "login_steam": "Login with Steam",
@@ -1574,8 +1551,7 @@
     "share_text": "Check out {name}'s profile on OpenFront",
     "share_x": "Share on X",
     "title": "Player Profile",
-    "view": "View Profile",
-    "view_leaderboard": "View leaderboard"
+    "view": "View Profile"
   },
   "player_stats_table": {
     "arrived": "Arrived",

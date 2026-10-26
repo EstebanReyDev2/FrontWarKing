@@ -16,8 +16,6 @@ import {
   ClanGamesResponseSchema,
   type ClanInfo,
   ClanInfoSchema,
-  type ClanLeaderboardResponse,
-  ClanLeaderboardResponseSchema,
   type ClanMembersResponse,
   ClanMembersResponseSchema,
   type ClanRequestsResponse,
@@ -67,40 +65,6 @@ async function clanFetch(
       Authorization: await getAuthHeader(),
     },
   });
-}
-
-export async function fetchClanLeaderboard(): Promise<
-  ClanLeaderboardResponse | false
-> {
-  try {
-    const res = await fetch(`${getApiBase()}/public/clans/leaderboard`, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!res.ok) {
-      console.warn(
-        "fetchClanLeaderboard: unexpected status",
-        res.status,
-        res.statusText,
-      );
-      return false;
-    }
-
-    const json = await res.json();
-    const parsed = ClanLeaderboardResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      console.warn(
-        "fetchClanLeaderboard: Zod validation failed",
-        parsed.error.toString(),
-      );
-      return false;
-    }
-
-    return parsed.data;
-  } catch (err) {
-    console.warn("fetchClanLeaderboard: request failed", err);
-    return false;
-  }
 }
 
 const CLAN_BROWSE_SEED_KEY = "clanBrowseSeed";

@@ -251,8 +251,6 @@ export class LangSelector extends LitElement {
       "emoji-table",
       "player-stats",
       "team-stats",
-      "leaderboard-player-list",
-      "leaderboard-clan-table",
       "build-menu",
       "win-modal",
       "game-starting-modal",
@@ -274,7 +272,6 @@ export class LangSelector extends LitElement {
       "player-profile-modal",
       "game-info-view",
       "ranking-controls",
-      "leaderboard-modal",
       "token-login",
       "tutorial-panel",
     ];

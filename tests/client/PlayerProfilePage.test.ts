@@ -61,8 +61,6 @@ const profile = {
 describe("public profile page", () => {
   let modal: PlayerProfileModal;
   let playPage: HTMLElement;
-  let leaderboard: HTMLElement & { open: () => void };
-  let leaderboardOpens: number;
 
   async function settle(assertion: () => void): Promise<void> {
     await vi.waitFor(async () => {
@@ -111,15 +109,6 @@ describe("public profile page", () => {
     fetchPublicPlayerProfileMock.mockResolvedValue(profile);
     history.replaceState(null, "", "/");
 
-    leaderboardOpens = 0;
-    leaderboard = document.createElement("leaderboard-modal") as HTMLElement & {
-      open: () => void;
-    };
-    leaderboard.open = () => {
-      leaderboardOpens++;
-    };
-    document.body.appendChild(leaderboard);
-
     modal = document.createElement(
       "player-profile-modal",
     ) as PlayerProfileModal;
@@ -133,7 +122,6 @@ describe("public profile page", () => {
   afterEach(() => {
     window.showPage?.("page-play");
     modal.remove();
-    leaderboard.remove();
     history.replaceState(null, "", "/");
   });
 
@@ -196,7 +184,7 @@ describe("public profile page", () => {
     it("hands the URL back to the hash once the profile is reopened in-app", async () => {
       await openFromPath("/player/aB3dE5fX");
       modal.close();
-      modal.openFromLeaderboard("other123");
+      modal.open({ publicID: "other123" });
       expect(url()).toBe("/#modal=profile&publicID=other123");
     });
 
@@ -221,7 +209,7 @@ describe("public profile page", () => {
     });
 
     it("moves the hash on to another player's profile opened over this one", async () => {
-      modal.openFromLeaderboard("aB3dE5fX");
+      modal.open({ publicID: "aB3dE5fX" });
       expect(url()).toBe("/#modal=profile&publicID=aB3dE5fX");
       modal.open({ publicID: "other123", tab: "clans" });
       expect(url()).toBe("/#modal=profile&publicID=other123&tab=clans");
@@ -360,7 +348,7 @@ describe("public profile page", () => {
 
     it("leaves the link out when the profile wasn't opened from one", async () => {
       fetchPublicPlayerProfileMock.mockResolvedValue(false);
-      modal.openFromLeaderboard("missing1");
+      modal.open({ publicID: "missing1" });
       await settle(() =>
         expect(modal.querySelector("[data-not-found]")).not.toBeNull(),
       );
@@ -377,22 +365,6 @@ describe("public profile page", () => {
         modal.querySelector('[data-action="play"] button') as HTMLElement
       ).click();
       expect(modal.isOpen()).toBe(false);
-      expect(url()).toBe("/");
-    });
-
-    it("View leaderboard opens the leaderboard", async () => {
-      fetchPublicPlayerProfileMock.mockResolvedValue(false);
-      await openFromPath("/player/missing1");
-      await settle(() =>
-        expect(
-          modal.querySelector('[data-action="leaderboard"]'),
-        ).not.toBeNull(),
-      );
-      (
-        modal.querySelector('[data-action="leaderboard"] button') as HTMLElement
-      ).click();
-      expect(modal.isOpen()).toBe(false);
-      expect(leaderboardOpens).toBe(1);
       expect(url()).toBe("/");
     });
   });

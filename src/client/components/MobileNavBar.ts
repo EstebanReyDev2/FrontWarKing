@@ -96,11 +96,6 @@ export class MobileNavBar extends LitElement {
           data-i18n="main.play"
         ></button>
         <button
-          class="${MOBILE_ITEM}"
-          data-page="page-leaderboard"
-          data-i18n="main.leaderboard"
-        ></button>
-        <button
           class="no-game-portal ${MOBILE_ITEM}"
           data-page="page-clan"
           data-i18n="main.clans"

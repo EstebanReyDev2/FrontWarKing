@@ -360,10 +360,6 @@ class Client {
       tag: "user-setting",
       pageId: "page-settings",
     });
-    modalRouter.register("leaderboard", {
-      tag: "leaderboard-modal",
-      pageId: "page-leaderboard",
-    });
     modalRouter.register("clan", { tag: "clan-modal", pageId: "page-clan" });
     modalRouter.register("account", {
       tag: "account-modal",
@@ -905,7 +901,6 @@ class Client {
       "troubleshooting-modal",
       "language-modal",
       "account-button",
-      "leaderboard-button",
       "token-login",
       "matchmaking-modal",
       "clan-modal",

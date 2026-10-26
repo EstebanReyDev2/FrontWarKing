@@ -17,7 +17,6 @@ import {
   fetchClanDonations,
   fetchClanExists,
   fetchClanGames,
-  fetchClanLeaderboard,
   fetchClanMembers,
   fetchClanRequests,
   fetchClans,
@@ -165,41 +164,6 @@ describe("checkClanTagOwnership", () => {
       tag: "ABC",
       error: null,
     });
-  });
-});
-
-describe("fetchClanLeaderboard", () => {
-  const leaderboardData = {
-    start: "2024-01-01T00:00:00.000Z",
-    end: "2024-01-07T23:59:59.000Z",
-    clans: [],
-  };
-
-  it("returns parsed data on success", async () => {
-    mockFetch(() => okJson(leaderboardData));
-    const result = await fetchClanLeaderboard();
-    expect(result).toEqual(leaderboardData);
-  });
-
-  it("returns false on non-ok response", async () => {
-    mockFetch(() => failRes(500));
-    const result = await fetchClanLeaderboard();
-    expect(result).toBe(false);
-  });
-
-  it("returns false on network error", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.reject(new Error("Network failure"))),
-    );
-    const result = await fetchClanLeaderboard();
-    expect(result).toBe(false);
-  });
-
-  it("returns false when Zod validation fails", async () => {
-    mockFetch(() => okJson({ start: "bad-date", end: "bad-date", clans: [] }));
-    const result = await fetchClanLeaderboard();
-    expect(result).toBe(false);
   });
 });
 
