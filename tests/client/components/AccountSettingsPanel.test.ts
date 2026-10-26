@@ -38,7 +38,6 @@ function makePlayer(overrides: Partial<UserMePlayer> = {}): UserMePlayer {
     achievements: { singleplayerMap: [] },
     friends: [],
     subscription: null,
-    currency: { soft: 100, hard: 10 },
     ...overrides,
   } as UserMePlayer;
 }

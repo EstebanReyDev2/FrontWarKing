@@ -23,7 +23,6 @@ import "./components/baseComponents/stats/PlayerStatsTree";
 import "./components/baseComponents/stats/SteamUserHeader";
 import { BaseModal } from "./components/BaseModal";
 import "./components/CopyButton";
-import "./components/CurrencyDisplay";
 import "./components/Difficulties";
 import { googleLinkButton } from "./components/ui/GoogleLinkButton";
 import { modalHeader } from "./components/ui/ModalHeader";
@@ -290,9 +289,9 @@ export class AccountModal extends BaseModal {
       });
   }
 
-  // Portal "connected as" view: avatar + username from the SDK, plus
-  // currency/subscription. No Discord/Google/email link or logout (the portal
-  // owns the account and its logout).
+  // Portal "connected as" view: avatar + username from the SDK. No
+  // Discord/Google/email link or logout (the portal owns the account and its
+  // logout).
   private renderPortalAccount(user: PortalUser): TemplateResult {
     return html`
       <div class="flex flex-col gap-6">
@@ -311,7 +310,6 @@ export class AccountModal extends BaseModal {
                 referrerpolicy="no-referrer"
               />
               <div class="text-white text-lg font-medium">${user.username}</div>
-              ${this.renderCurrency()}
             </div>
           </div>
         </div>
@@ -388,25 +386,12 @@ export class AccountModal extends BaseModal {
     `;
   }
 
-  private renderCurrency(): TemplateResult {
-    const currency = this.userMeResponse?.player?.currency;
-    if (!currency) return html``;
-
-    return html`
-      <currency-display
-        .hard=${currency.hard}
-        .soft=${currency.soft}
-      ></currency-display>
-    `;
-  }
-
   private renderLoggedInAs(): TemplateResult {
     const me = this.userMeResponse?.user;
     if (me?.discord) {
       return html`
         <div class="flex flex-col items-center gap-3 w-full">
-          ${this.renderCurrency()} ${this.renderGoogleLink()}
-          ${this.renderSteamLink()}
+          ${this.renderGoogleLink()} ${this.renderSteamLink()}
         </div>
       `;
     } else if (me?.google) {
@@ -417,7 +402,7 @@ export class AccountModal extends BaseModal {
               account_name: me.google.email,
             })}
           </div>
-          ${this.renderCurrency()} ${this.renderSteamLink()}
+          ${this.renderSteamLink()}
         </div>
       `;
     } else if (me?.email) {
@@ -428,17 +413,7 @@ export class AccountModal extends BaseModal {
               account_name: me.email,
             })}
           </div>
-          ${this.renderCurrency()} ${this.renderGoogleLink()}
-          ${this.renderSteamLink()}
-        </div>
-      `;
-    } else if (me?.steam) {
-      // Steam is the primary login and v1 does not support linking a second
-      // identity or unlinking Steam itself, so no Discord/Google CTA here —
-      // just the currency balance and (session) logout.
-      return html`
-        <div class="flex flex-col items-center gap-3 w-full">
-          ${this.renderCurrency()}
+          ${this.renderGoogleLink()} ${this.renderSteamLink()}
         </div>
       `;
     }
@@ -665,7 +640,6 @@ export class AccountModal extends BaseModal {
                   ${translateText("account_modal.desktop_sign_in_desc")}
                 </p>`
               : nothing}
-            ${this.renderCurrency()}
           </div>
 
           ${this.renderLoginError()}
