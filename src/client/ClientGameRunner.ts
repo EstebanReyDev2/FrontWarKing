@@ -20,10 +20,10 @@ import { GameMapLoader } from "@openfront/shared/GameMapLoader";
 import { replacer } from "@openfront/shared/SharedUtil";
 import {
   GameRecord,
-  GroupTokenEvent,
   LobbyInfoEvent,
   PlayerCosmeticRefs,
   ServerMessage,
+  ServerStartGameMessage,
   WireGameStartInfo,
 } from "@openfront/shared/WireSchemas";
 import { ClientEnv } from "../client/ClientEnv";
@@ -50,7 +50,6 @@ import {
 } from "./InputHandler";
 
 import { pagePin } from "./PagePin";
-import { groupTokenOf, loggableStartMessage } from "./PresenceGroup";
 import {
   applyGraphicsOverrides,
   createRenderSettings,
@@ -98,6 +97,17 @@ import { createCanvas } from "./Utils";
 import { GameView, PlayerView } from "./view";
 import { WebGLFrameBuilder } from "./WebGLFrameBuilder";
 import { WorkerClient } from "./WorkerClient";
+
+// The start message as it is safe to log: everything except the grouping token.
+// Players paste consoles into bug reports, and the token must not travel that
+// way.
+function loggableStartMessage(
+  message: ServerStartGameMessage,
+): Record<string, unknown> {
+  const loggable: Record<string, unknown> = { ...message };
+  delete loggable.groupToken;
+  return loggable;
+}
 
 export interface LobbyConfig {
   cosmetics: PlayerCosmeticRefs;
@@ -215,12 +225,6 @@ export function joinLobby(
   };
 
   const onmessage = (message: ServerMessage) => {
-    // Before the per-type handling below: the token rides two different
-    // messages and the listener does not care which one delivered it.
-    const groupToken = groupTokenOf(message);
-    if (groupToken !== undefined) {
-      eventBus.emit(new GroupTokenEvent(groupToken));
-    }
     if (message.type === "lobby_info") {
       // Server tells us our assigned clientID
       clientID = message.myClientID;

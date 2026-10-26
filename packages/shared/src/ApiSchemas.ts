@@ -1295,38 +1295,6 @@ export type RankedLeaderboardResponse = z.infer<
   typeof RankedLeaderboardResponseSchema
 >;
 
-export const FriendEntrySchema = z.object({
-  publicId: z.string(),
-  // Account username (null = never set), always the other party's. Render
-  // `username ?? publicId`; identify players by publicId only.
-  username: z.string().nullable().optional(),
-  createdAt: z.iso.datetime(),
-});
-export type FriendEntry = z.infer<typeof FriendEntrySchema>;
-
-export const FriendRequestsResponseSchema = z.object({
-  incoming: FriendEntrySchema.array(),
-  outgoing: FriendEntrySchema.array(),
-});
-export type FriendRequestsResponse = z.infer<
-  typeof FriendRequestsResponseSchema
->;
-
-export const FriendsListResponseSchema = z.object({
-  results: FriendEntrySchema.array(),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
-});
-export type FriendsListResponse = z.infer<typeof FriendsListResponseSchema>;
-
-export const SendFriendRequestResponseSchema = z.object({
-  status: z.enum(["requested", "accepted"]),
-});
-export type SendFriendRequestResponse = z.infer<
-  typeof SendFriendRequestResponseSchema
->;
-
 export const NewsItemSchema = z.object({
   id: z.string(),
   title: z.string(),

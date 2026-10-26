@@ -1,7 +1,4 @@
-import {
-  PlayerStatsTree,
-  UserMeResponse,
-} from "@openfront/shared/ApiSchemas";
+import { PlayerStatsTree, UserMeResponse } from "@openfront/shared/ApiSchemas";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import { html, nothing, TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -28,7 +25,6 @@ import { BaseModal } from "./components/BaseModal";
 import "./components/CopyButton";
 import "./components/CurrencyDisplay";
 import "./components/Difficulties";
-import "./components/FriendsList";
 import { googleLinkButton } from "./components/ui/GoogleLinkButton";
 import { modalHeader } from "./components/ui/ModalHeader";
 import { steamGlyph, steamLinkButton } from "./components/ui/SteamLinkButton";
@@ -175,7 +171,6 @@ export class AccountModal extends BaseModal {
         { key: "account", label: translateText("account_modal.tab_account") },
         { key: "stats", label: translateText("account_modal.tab_stats") },
         { key: "games", label: translateText("account_modal.tab_games") },
-        { key: "friends", label: translateText("account_modal.tab_friends") },
       ],
     };
   }
@@ -206,8 +201,6 @@ export class AccountModal extends BaseModal {
         return this.renderStatsTab();
       case "games":
         return this.renderGamesTab();
-      case "friends":
-        return this.renderFriendsTab();
       default:
         return this.renderAccountTab();
     }
@@ -231,26 +224,6 @@ export class AccountModal extends BaseModal {
         @click=${this.handleSubmit}
       ></o-button>
     `;
-  }
-
-  private renderFriendsTab(): TemplateResult {
-    const myPublicId = this.userMeResponse?.player?.publicId ?? "";
-    return html`<friends-list
-      .myPublicId=${myPublicId}
-      @view-profile=${(e: CustomEvent<{ publicId: string }>) =>
-        this.openPlayerProfile(e.detail.publicId)}
-    ></friends-list>`;
-  }
-
-  private openPlayerProfile(publicId: string): void {
-    const profileModal = document.querySelector<
-      HTMLElement & { openFromAccount(publicId: string): void }
-    >("player-profile-modal");
-    profileModal?.openFromAccount(publicId);
-  }
-
-  public returnToFriends(): void {
-    this.open({ tab: "friends" });
   }
 
   private renderAccountTab(): TemplateResult {

@@ -604,8 +604,8 @@ function isWebScheme(locationProtocol: string): boolean {
  * link built from `window.location` reads
  * `app://openfront/index.html#modal=profile&publicID=…`, which resolves to
  * nothing anywhere except inside that one Electron app. It is not even a link
- * the desktop client itself can take back: the friends box only unwraps http(s)
- * URLs. So the shell's links go to siteOrigin() — the website it was downloaded
+ * the desktop client itself can take back. So the shell's links go to
+ * siteOrigin() — the website it was downloaded
  * from (openfront.io in prod, a branch subdomain on staging) — with the same
  * audience fallback desktopWebAccountSettingsUrl in Auth.ts already used for
  * this question, localhost dev port included, for a shell that injects neither

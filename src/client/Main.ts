@@ -7,8 +7,6 @@ import { toWireGameStartInfo } from "@openfront/shared/SharedUtil";
 import {
   GameInfo,
   GameRecord,
-  GroupTokenEvent,
-  LobbyInfoEvent,
   PublicGameInfo,
   WireGameStartInfo,
 } from "@openfront/shared/WireSchemas";
@@ -34,7 +32,6 @@ import {
 } from "./BootInterrupts";
 import type { JoinLobbyResult } from "./ClientGameRunner";
 import { getPlayerCosmeticsRefs } from "./Cosmetics";
-import { desktopPresence, type PresencePayload } from "./DesktopPresence";
 import { subscribeDesktopSessionRecovery } from "./DesktopSessionRecovery";
 import {
   desktopUpdate,
@@ -71,11 +68,6 @@ import { updateAccountNavButton } from "./NavAccountButton";
 import { initNavigation } from "./Navigation";
 import { capturePagePin } from "./PagePin";
 import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
-import {
-  GroupTokenTracker,
-  presenceLobbyId,
-  withGroupToken,
-} from "./PresenceGroup";
 import {
   ensureServerList,
   redirectToGameVersion,
@@ -115,7 +107,6 @@ import {
   flushReloadToast,
   homeHref,
   incrementGamesPlayed,
-  presenceMapKey,
   reloadForUpdate,
   translateText,
 } from "./Utils";
@@ -271,13 +262,6 @@ class Client {
   // confirm over a game that is starting.
   private joinInFlight = false;
 
-  // Presence inputs. A private, hosted or matchmade JoinLobbyEvent carries
-  // nothing but the game id, so the server's lobby_info is the only place the
-  // client ever learns the map, size and roster -- keep the latest view here
-  // and reuse it once the game starts, when no lobby_info arrives any more.
-  private presenceDetail: Omit<PresencePayload, "state"> = {};
-  private presenceSpectating = false;
-  private presenceInGame = false;
   /**
    * Whether the home page is currently torn down for a game.
    *
@@ -296,11 +280,6 @@ class Client {
    * would already have been disarmed had it been there to hear them.
    */
   private menuTornDown = false;
-  // Held apart from presenceDetail because that object is REPLACED wholesale
-  // on every lobby_info, and the token rides every one of those (once a
-  // second) as well as the start message. Merged back in at emit time; see
-  // GroupTokenTracker for why a repeat must not re-emit.
-  private readonly presenceGroup = new GroupTokenTracker();
 
   private turnstileTokenPromise: Promise<TurnstileToken> | null = null;
 
@@ -373,11 +352,6 @@ class Client {
     };
 
     gamePortal.maybeInit();
-
-    // Every exit from a game (win screen, in-game quit, popstate) navigates to
-    // "/" and re-runs this, so announcing the menu here also covers "returned
-    // to the menu" without hooking each of those paths.
-    desktopPresence.set({ state: "menu" });
 
     // Register modals with the URL router. Lobby modals (join/host) and
     // matchmaking are intentionally omitted — they own their own URL state
@@ -512,45 +486,11 @@ class Client {
       }
     });
 
-    // The server's lobby view is the only source for a lobby's real map, size
-    // and roster, and the only place the client learns that a play/spectate
-    // switch was accepted (the server can refuse it). Both feed presence.
-    this.eventBus.on(LobbyInfoEvent, (event) => {
-      const config = event.lobby.gameConfig;
-      this.presenceDetail = {
-        gameType: config?.gameType,
-        gameMode: config?.gameMode,
-        map: presenceMapKey(config?.gameMap),
-        // Seats, not connections: spectators are in the roster but hold none
-        // (mirrors LobbyPlayerView and the join modal's own count).
-        playerCount: event.lobby.clients?.filter((c) => !c.spectator).length,
-        maxPlayers: config?.maxPlayers,
-        lobbyId: presenceLobbyId(config, event.lobby.gameID),
-      };
-      this.presenceSpectating =
-        event.lobby.clients?.find((c) => c.clientID === event.myClientID)
-          ?.spectator === true;
-      this.emitPresence();
-    });
-
-    // The game's grouping token, from lobby_info in the lobby or from the
-    // start message for someone who joined after it. Spectators get it too:
-    // they are in the same group, and it is the shell that decides what a
-    // spectator does to the group's size.
-    this.eventBus.on(GroupTokenEvent, (event) => {
-      if (this.presenceGroup.accept(event.groupToken)) {
-        this.emitPresence();
-      }
-    });
-
     document.addEventListener("join-lobby", (event) => {
       // A rejected handshake (Turnstile alerts then rejects) never assigns
-      // lobbyHandle, so nothing downstream clears the "lobby" presence
-      // emitted at the top of the join -- friends would keep being offered a
-      // Join into a lobby the player never entered. Re-throw so the failure
-      // still surfaces exactly as it does today.
+      // lobbyHandle. Re-throw so the failure still surfaces exactly as it does
+      // today.
       void this.handleJoinLobby(event).catch((error) => {
-        this.resetPresenceToMenu();
         // joinInFlight has exactly the same problem: set when the join
         // committed, and cleared only on the two paths that reach a handle.
         // Left set it would silence every boot interrupt for the rest of the
@@ -808,28 +748,6 @@ class Client {
     } else {
       this.handleUrl();
     }
-
-    // An invite accepted from outside the app is parked by the shell, because
-    // it arrives before this renderer exists. Pull it now that we are alive.
-    void desktopPresence
-      .consumePendingInvite()
-      .then((gameId) => (gameId === null ? undefined : this.openInvite(gameId)))
-      .catch(() => undefined);
-
-    // Invites arriving while we are already running. The pushed id is
-    // deliberately ignored: the shell parks every invite as well as pushing
-    // it, so the push is only a nudge and the parked copy is the single
-    // source of truth. Pulling here is what clears it -- otherwise leaving a
-    // game (a full page load) would re-run the pull above and force the join
-    // modal open on a match that has already finished.
-    desktopPresence.subscribeInvites(() => {
-      void desktopPresence
-        .consumePendingInvite()
-        .then((gameId) =>
-          gameId === null ? undefined : this.openInvite(gameId),
-        )
-        .catch(() => undefined);
-    });
 
     const onHashUpdate = () => {
       if (this.replayViewerID !== null) {
@@ -1388,41 +1306,6 @@ class Client {
     this.joinInFlight = true;
 
     console.log(`joining lobby ${lobby.gameID}`);
-    // Entering a lobby. Singleplayer, public lobbies and replays know their
-    // config up front; everything else is filled in by the lobby_info
-    // subscription in initialize() a moment later.
-    const joinConfig =
-      lobby.gameStartInfo?.config ??
-      lobby.publicLobbyInfo?.gameConfig ??
-      lobby.gameRecord?.info.config;
-    const joinInfo = lobby.publicLobbyInfo;
-    this.presenceInGame = false;
-    this.presenceSpectating = lobby.spectator === true;
-    // Dropped here, not on leaving: a game we are joining must never inherit
-    // the previous one's group, and singleplayer must carry none at all.
-    this.presenceGroup.clear();
-    this.presenceDetail = {
-      gameType: joinConfig?.gameType,
-      gameMode: joinConfig?.gameMode,
-      map: presenceMapKey(joinConfig?.gameMap),
-      playerCount:
-        joinInfo === undefined
-          ? undefined
-          : "numClients" in joinInfo
-            ? joinInfo.numClients
-            : joinInfo.clients?.filter((c) => !c.spectator).length,
-      maxPlayers: joinConfig?.maxPlayers,
-      // Omitted for singleplayer and replays: no server hosts those ids, so
-      // advertising one has the shell offer friends a Join that cannot work.
-      // The optional field already means "not joinable". presenceLobbyId
-      // withholds it for public FFA too, for the same reason the invite
-      // button hides there: a friend joining that match is a team.
-      lobbyId:
-        lobby.source === "singleplayer" || lobby.gameRecord !== undefined
-          ? undefined
-          : presenceLobbyId(joinConfig, lobby.gameID),
-    };
-    this.emitPresence();
 
     if (this.lobbyHandle !== null) {
       console.log("joining lobby, stopping existing game");
@@ -1523,11 +1406,6 @@ class Client {
       // through the wait hide at this point instead of on join.
       this.menuTornDown = true;
       document.dispatchEvent(new CustomEvent("game-starting"));
-      // Earliest point the lobby is provably closed: the server has stopped
-      // broadcasting lobby_info and refuses new seats, so the shell must stop
-      // advertising this as joinable even though terrain is still loading.
-      this.presenceInGame = true;
-      this.emitPresence();
       console.log("Closing modals");
       if (this.usernameInput) {
         // fix edge case where username-validation-error is re-rendered and hidden tag removed
@@ -1598,99 +1476,6 @@ class Client {
     });
   }
 
-  // State is derived rather than passed in so every caller agrees on what
-  // "spectating" outranks. Emitting is idempotent -- the shell diffs -- so
-  // callers never have to know whether anything actually changed.
-  private emitPresence() {
-    desktopPresence.set(
-      withGroupToken(
-        {
-          state: this.presenceSpectating
-            ? "spectating"
-            : this.presenceInGame
-              ? "game"
-              : "lobby",
-          ...this.presenceDetail,
-        },
-        this.presenceGroup.current(),
-      ),
-    );
-  }
-
-  // Back to the menu, forgetting the lobby we were describing so a later one
-  // cannot inherit its map or roster.
-  private resetPresenceToMenu() {
-    this.presenceDetail = {};
-    this.presenceSpectating = false;
-    this.presenceInGame = false;
-    this.presenceGroup.clear();
-    desktopPresence.set({ state: "menu" });
-  }
-
-  // An invite lands the player exactly where a /game/<id> link would. The
-  // shell validated the id already; re-checking keeps the invariant next to
-  // the modal that trusts it.
-  private async openInvite(gameId: string): Promise<void> {
-    if (!GAME_ID_REGEX.test(gameId)) return;
-    // An invite can arrive mid-match, unlike the CrazyGames invite this path
-    // was modelled on, which only ever runs at cold start. Force-opening the
-    // join UI would leave it overlaying a game whose socket and render loop
-    // keep running underneath. Same rule the back-button exit uses: stop
-    // silently when the player is not active, ask first when they are, and
-    // drop the invite entirely if they decline.
-    if (this.lobbyHandle !== null) {
-      // stop() without force is the codebase's "is the player actually in
-      // this?" test: it tears the game down and returns true when they are
-      // not, and refuses (returning false) when they are.
-      if (!this.lobbyHandle.stop()) {
-        const confirmed = await showInGameConfirm(
-          translateText("help_modal.exit_confirmation"),
-        );
-        if (!confirmed) return;
-      }
-      // Navigate rather than leaving in place. handleLeaveLobby() was only
-      // ever called during the pre-start lobby wait; every exit from a
-      // STARTED game goes through a full location.href navigation, and it is
-      // that reload -- not handleLeaveLobby -- which restores the started-game
-      // teardown. Two pieces of it have no in-place restore path:
-      // gameModeSelector.stop() (line ~1139/1157) kills the public lobby
-      // socket, whose start() is only ever called from connectedCallback();
-      // and the same block hides every .ad element, which nothing ever
-      // un-hides. Leaving in place therefore stranded the player on a
-      // homepage with a frozen lobby list and no ad rails whenever the join
-      // did not complete -- modal closed, or lobby full/already started.
-      //
-      // Navigating to the lobby's own /game/<id> URL rather than "/" means
-      // the invite survives the reload without needing to be stashed: the
-      // path parser in handleUrl() opens the join modal on the way back up,
-      // which is the same route a shared lobby link takes.
-      // The /w<n>/game/<id> shape only exists on the game-server origin, so
-      // this root-relative navigation must not run on the replay shell host --
-      // it would resolve against replay.<domain>, 404, and lose the invite,
-      // which consumePendingInvite() has already taken. Same guard, for the
-      // same reason, as handleJoinLobby and updateJoinUrlForShare above.
-      //
-      // Not reachable from the desktop shell today: it classifies every
-      // https:// URL as open-externally, so redirectToVersionedShell() hands
-      // the replay host to the OS browser and this window stays on
-      // app://openfront/. That is a policy in a different repo though, and
-      // nothing here would notice if it changed -- so guard rather than depend
-      // on it. On the replay host, fall back to the in-place leave.
-      if (!isReplayShellHost(window.location.hostname)) {
-        this.resetPresenceToMenu();
-        window.location.href = currentPagePath(ClientEnv.gamePath(gameId));
-        return;
-      }
-      await this.handleLeaveLobby();
-    }
-    // The modal loads on demand (see LazyModals).
-    whenModalLoaded("join-lobby-modal", () => {
-      window.showPage?.("page-join-lobby");
-      this.joinModal?.open({ lobbyId: gameId });
-    });
-    console.log(`joining lobby ${gameId} from desktop invite`);
-  }
-
   private updateJoinUrlForShare(lobbyId: string) {
     const lobbyIdHidden = !this.userSettings.lobbyIdVisibility();
     let targetUrl: string;
@@ -1718,15 +1503,8 @@ class Client {
   }
 
   private async handleLeaveLobby(event?: CustomEvent) {
-    // Above the lobbyHandle guard on purpose. Presence goes to "lobby" when
-    // the join starts, but lobbyHandle is only assigned once the handshake
-    // finishes; a modal closed during that window dispatches leave-lobby and
-    // takes the early return below, stranding the shell on a lobby the player
-    // is not in. Leaving in place also means no navigation follows to reset it.
-    this.resetPresenceToMenu();
-    // Above the guard for the same reason resetPresenceToMenu is: a modal
-    // closed during the pre-handle window dispatches leave-lobby and returns
-    // early, which would otherwise strand the flag set forever.
+    // Above the guard on purpose: a modal closed during the pre-handle window
+    // dispatches leave-lobby and takes the early return below.
     this.joinInFlight = false;
     // And supersede whatever join is still in flight. Clearing the flag alone
     // says the player is not joining while the join carries on to assign a
@@ -1755,9 +1533,9 @@ class Client {
 
     // The inverse of the game-start teardown. Every other exit from a started
     // game navigates, and the reload did this implicitly; this path leaves in
-    // place, so it has to do it explicitly (OPE-255). It lives here rather
-    // than in openInvite() because handleLeaveLobby is reached from several
-    // places and any of them could be the next to hit it after a teardown.
+    // place, so it has to do it explicitly (OPE-255). It lives here because
+    // handleLeaveLobby is reached from several places and any of them could
+    // be the next to hit it after a teardown.
     //
     // The gate asks whether the menu is torn down, NOT whether we were
     // in-game: the teardown happens at prestart while the in-game signal is

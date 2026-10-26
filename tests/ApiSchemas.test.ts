@@ -2,7 +2,6 @@ import {
   ClaimAllRewardsResponseSchema,
   ClaimRewardHeldResponseSchema,
   ClaimRewardResponseSchema,
-  FriendEntrySchema,
   GetMyTribeNamesResponseSchema,
   GoogleUser,
   GoogleUserSchema,
@@ -306,30 +305,6 @@ describe("UserMeResponseSchema clan balances", () => {
 
   it("rejects numeric balances", () => {
     expect(clans.safeParse([{ ...clan, hardBalance: 25 }]).success).toBe(false);
-  });
-});
-
-describe("FriendEntrySchema", () => {
-  const base = {
-    publicId: "abc123",
-    createdAt: "2024-01-15T12:00:00.000Z",
-  };
-
-  it("accepts an entry with an account username", () => {
-    const result = FriendEntrySchema.safeParse({
-      ...base,
-      username: "bob.4821",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts username: null (friend never set one)", () => {
-    const result = FriendEntrySchema.safeParse({ ...base, username: null });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts an entry without username (older API)", () => {
-    expect(FriendEntrySchema.safeParse(base).success).toBe(true);
   });
 });
 

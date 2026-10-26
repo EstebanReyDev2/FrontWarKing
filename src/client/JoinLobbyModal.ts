@@ -24,7 +24,6 @@ import {
 import { getApiBase } from "./Api";
 import { BaseModal } from "./components/BaseModal";
 import { GameStartAlertController } from "./components/GameStartAlertController";
-import { inviteFriendsButton } from "./components/ui/InviteFriendsButton";
 import { DEFAULT_TITLE_CLASS, modalHeader } from "./components/ui/ModalHeader";
 import { gamePortal } from "./GamePortal";
 import { SendSpectateEvent } from "./LobbyEvents";
@@ -124,35 +123,23 @@ export class JoinLobbyModal extends BaseModal {
         ariaLabel: translateText("common.close"),
       });
     }
-    // Both affordances answer "get my friends into this lobby", so they sit
-    // together. The Steam invite works for public and private lobbies alike,
-    // because the shell keeps a shadow lobby for any joined game.
-    // Except public FFA: bringing friends into an every-man-for-himself
-    // public match encourages teaming, so both stay off there. Public team
-    // lobbies and private lobbies keep them. A config that has not arrived
-    // yet counts as "off" too — the URL-join and accepted-invite paths render
-    // this header before the first lobby_info, and that window must not show
-    // a button the config may be about to forbid.
     const isPublicFfa =
       this.gameConfig?.gameType === GameType.Public &&
       this.gameConfig.gameMode !== GameMode.Team;
-    const canShare = this.gameConfig !== null && !isPublicFfa;
-    const copy = canShare
-      ? html`<copy-button .lobbyId=${this.currentLobbyId}></copy-button>`
-      : undefined;
-    const invite = canShare ? inviteFriendsButton() : undefined;
+    const copy =
+      this.gameConfig !== null && !isPublicFfa
+        ? html`<copy-button .lobbyId=${this.currentLobbyId}></copy-button>`
+        : undefined;
     return modalHeader({
       // titleContent (not title) so the bell can sit at the right edge of the
-      // title row via ml-auto, next to the copy/invite cluster.
+      // title row via ml-auto, next to the copy button.
       titleContent: html`<span class="${DEFAULT_TITLE_CLASS}"
           >${translateText("public_lobby.title")}</span
         >
         ${this.gameStartAlert.renderBell()}`,
       onBack: () => this.closeAndLeave(),
       ariaLabel: translateText("common.close"),
-      rightContent: invite
-        ? html`<div class="flex items-center gap-2">${copy}${invite}</div>`
-        : copy,
+      rightContent: copy,
     });
   }
 

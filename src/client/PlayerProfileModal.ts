@@ -31,7 +31,7 @@ import { currentPagePath, translateText } from "./Utils";
 export { playerProfileUrl };
 
 /** Where a profile was opened from, i.e. where its Back button leads. */
-export type ProfileOrigin = "clan" | "leaderboard" | "account";
+export type ProfileOrigin = "clan" | "leaderboard";
 
 @customElement("player-profile-modal")
 export class PlayerProfileModal extends BaseModal {
@@ -454,11 +454,6 @@ export class PlayerProfileModal extends BaseModal {
     this.openedFrom = "leaderboard";
   }
 
-  public openFromAccount(publicId: string): void {
-    this.open({ publicID: publicId });
-    this.openedFrom = "account";
-  }
-
   private back(): void {
     const openedFrom = this.openedFrom;
     this.close();
@@ -472,12 +467,6 @@ export class PlayerProfileModal extends BaseModal {
       document
         .querySelector<HTMLElement & { open(): void }>("leaderboard-modal")
         ?.open();
-    } else if (openedFrom === "account") {
-      document
-        .querySelector<HTMLElement & { returnToFriends(): void }>(
-          "account-modal",
-        )
-        ?.returnToFriends();
     }
   }
 }

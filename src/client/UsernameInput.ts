@@ -99,7 +99,7 @@ function resolveVerifiedDefaultCohort(onGamePortal: boolean): void {
 
 // Same format the account modal's grace warning uses, so the two places that
 // name this deadline read alike. Local rather than shared: every component in
-// this codebase that shows a date formats its own (FriendsList, TribesPanel,
+// this codebase that shows a date formats its own (e.g. TribesPanel,
 // SubscriptionPanel, UsernamePanel).
 function formatClaimDate(date: Date): string {
   return date.toLocaleDateString(undefined, {
