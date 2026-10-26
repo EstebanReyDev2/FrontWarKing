@@ -549,7 +549,6 @@
     "duration_minute_short": "min",
     "duration_second_short": "s",
     "enabled": "Enabled",
-    "error_generic": "Something went wrong. Please try again.",
     "expand_all": "Expand all",
     "failed_copy": "Failed to copy",
     "loading": "Loading...",
@@ -1849,9 +1848,7 @@
   },
   "store": {
     "insufficient_currency_body": "You need {amount, number} more {currency} to buy {item}.",
-    "insufficient_currency_title": "Insufficient {currency}",
-    "pack_debt": "Your Plutonium balance is {debt} in debt. Settle it before buying.",
-    "purchase_failed": "Purchase failed. Please try again."
+    "insufficient_currency_title": "Insufficient {currency}"
   },
   "team_colors": {
     "blue": "Blue",
