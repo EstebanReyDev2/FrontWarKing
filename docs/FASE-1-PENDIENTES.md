@@ -13,7 +13,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                     |
 | 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                     |
 | 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1` |
-| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Pendiente           | —                                                                            |
+| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a, 5b y 5c) | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`                           |
 | 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                            |
 
 ### Cómo se verifica cada grupo
@@ -83,11 +83,47 @@ Se borraron 50 tests: 32 de `SteamGrantNotices.test.ts`, 1 de
 (`steam_grant.*` y `username.lapse_notice_after_*`). `LangSelector` perdió los
 tags `top-bar`, `level-badge` y `past-game-xp-card`, que ya no existen.
 
+### Resultado del Bloque 1 (5a, 5b y 5c)
+
+Dos corridas completas consecutivas: **7090 tests, 7008 pasados, 81 fallados y
+1 pending por corrida**. Los 81 nombres son idénticos en ambas corridas, están
+todos en `docs/baseline-failures.txt` y no apareció ningún nombre nuevo.
+Typecheck y lint en 0.
+
+Contra la línea base pre-Fase 1 desaparecieron 6 fallos estables porque sus
+tests se borraron en bloques anteriores. En este bloque se borraron 14 archivos
+de test (4 de Twitch, 4 de friends/presencia y 6 de tribus) y se podaron casos
+de `ApiSchemas.test.ts`, `LeaderboardModal.test.ts`, `HostLobbyModal*.test.ts`,
+`JoinLobbyModal.test.ts` y `Utils.mapKey.test.ts`.
+
+Pruebas manuales con `npm run dev` (Vite en 9000 y server en 3000/3001/3002):
+
+- La home no muestra Twitch, streams, friends ni tribus.
+- La clasificación no tiene pestaña Tribes. El deep link
+  `#modal=leaderboard&tab=tribes` cae en `players` y muestra las pestañas
+  players, 2v2, FFA y clans.
+- La cuenta no tiene pestaña Friends. El deep link
+  `#modal=account&tab=friends` abre la cuenta normal.
+- Los modales de host y join no contienen `Invite Friends`.
+- La consola no muestra `Translation key not found` ni errores de módulos
+  borrados. Sólo aparece el ruido esperado de `localhost:8787` que se documenta
+  más abajo.
+
 ## Borrado obligatorio antes de cerrar la Fase 1
 
 Esta es la lista de supervivientes del Grupo 4 y de los restos del Grupo 3. La
 Fase 1 **no se cierra** hasta que quede vacía. Cada ítem indica el subgrupo que
 lo elimina; al borrarlo se marca la casilla y se tacha el nombre.
+
+### 5a, 5b y 5c · Social, amigos y tribus pagas — hecho
+
+- [x] ~~Twitch: `FeaturedStream`, `StreamsFeed`, `StreamingNow` y
+      `resources/streams.json`~~ — `76f4892e5`
+- [x] ~~Friends: `FriendsList`, `FriendsApi`, `DesktopPresence`,
+      `PresenceGroup` e `InviteFriendsButton`~~ — `e1b4a66c5`
+- [x] ~~Tribus pagas: `TribesPanel`, `TribeStatsView`,
+      `LeaderboardTribeTable`, APIs y schemas~~ — `ccc006f55`
+- [x] ~~Claves de traducción huérfanas del recorte de tribus~~ — `b851ca0d6`
 
 ### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
@@ -194,8 +230,8 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 
 ### Restos que no son de este grupo
 
-- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5
-- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5
+- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5 (clanes)
+- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5 (host y cola paga)
 - [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder` — Grupo 6
 
 ## Deuda para Fase 2
@@ -214,6 +250,26 @@ timeout de 10 s. En Fase 2, sin ese servidor, la petición debe fallar rápido y
 el juego debe arrancar igual. Hay que verificar también que una URL inexistente
 en Vercel no devuelva el `index.html`: un fallback SPA haría pasar un 404 por un
 catálogo válido.
+
+### Campos y schemas que sobreviven al Bloque 1
+
+Estos nombres no se tocaron en 5a-5c. La columna "estado" dice qué queda vivo
+hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
+
+| Nombre              | Dónde queda                                                                 | Estado después del Bloque 1                                                                 | Cuándo se va |
+| ------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
+| `friends`           | `WireSchemas`, `ApiSchemas`, `SharedUtil`, `engine-api`, snapshots          | Campo inerte en el cliente: la UI ya no lo lee. Sigue en el wire y en `TeamAssignment`.     | Fase 2       |
+| `GroupToken`        | `WireSchemas` (`GroupTokenEvent`, mensajes de lobby/start)                   | El cliente ya no lo emite ni lo consume; el evento y el schema siguen por el netcode.       | Fase 2       |
+| `tribeNames`        | `CosmeticSchemas`                                                           | Sin consumidores tras borrar la tienda de tribus. El schema queda para no tocar el contrato. | Fase 2       |
+| `lobbyQueue`        | `CosmeticSchemas`, `HostLobbyModal`                                         | Todavía vivo: el host muestra el precio de la cola paga (5g).                               | 5g y Fase 2  |
+| `clanTag`           | `engine-api`, `engine`, `WireSchemas`, `ApiSchemas`, cliente de clanes       | Todavía vivo para clanes (5f) y para el estado determinista del engine.                     | Fase 2       |
+| `RankedType`        | `engine-api`, `engine`, `ApiSchemas`, stats y leaderboard del cliente        | Todavía vivo para ranked (5e) y para el check de victoria del engine.                       | Fase 2       |
+| `ClanApiSchemas`    | `ClanApi.ts`, `LeaderboardClanTable`, `ClanStatsBreakdown`, `PrivilegeRefresher` | Todavía vivo para clanes (5f); `PrivilegeRefresher` lo usa en el server.                    | Fase 2       |
+| `TeamAssignment`    | `engine-lib/src/game/TeamAssignment.ts`                                     | Agrupa por `clanTag` y `friends`; con ambos vacíos la agrupación queda inerte, pero se conserva. | Fase 2       |
+
+`TeamAssignment` se verifica en una partida por equipos contra bots: debe
+repartir equipos sin errores y sin leer `friends` (vacío) ni `clanTag` (null).
+Esa prueba se hace al cerrar 5e/5f, no en este bloque.
 
 ## Contratos del engine y del netcode
 
@@ -421,9 +477,9 @@ Con el cliente levantado y el API de `localhost:8787` apagado, la consola del
 navegador muestra errores que **no son regresiones**. Desaparecen cuando el
 server está arriba:
 
-- **CORS / `Failed to fetch`** en `cluster.json`, `streams.json`,
-  `auth/refresh` y `cosmetics.json`. El cliente los pide a `8787`; sin server,
-  el navegador corta la petición.
+- **CORS / `Failed to fetch`** en `cluster.json`, `auth/refresh`,
+  `cosmetics.json`, `leaderboard/ranked` y `public/clans/leaderboard`. El
+  cliente los pide a `8787`; sin server, el navegador corta la petición.
 - **`Server list API unreachable` / `Server list API still unreachable`**:
   `ServerList.ts` cae al fallback offline.
 - **`Lobby socket ... closed (1001/1006)`**: Vite proxya `/w1` a `8787`; sin
@@ -451,6 +507,23 @@ entre `main` y la rama de Fase 1. Los avisos de Turnstile vienen de
 buscá errores de módulos borrados, `Translation key not found`, o fallos del
 render/WebGL. El smoke test de cada grupo está arriba.
 
+### Worktree de verificación bloqueado
+
+El worktree temporal que se usó para comparar contra `main` quedó con un
+directorio que Windows no deja borrar desde Git:
+
+`C:\Users\esteban.rey\AppData\Local\Temp\opencode\frontwars-main`
+
+Ya no aparece en `git worktree list`. Para limpiarlo del todo, borrar la carpeta
+a mano y podar la metadata:
+
+```powershell
+Remove-Item -Recurse -Force C:\Users\esteban.rey\AppData\Local\Temp\opencode\frontwars-main
+git worktree prune
+```
+
+No afecta al repo ni a la rama; es sólo basura local de la verificación.
+
 ## Economía interna: qué se conserva
 
 ### `SubscriptionPolicy.ts` se borró
@@ -467,12 +540,12 @@ consumidor, así que no quedaba nada que la leyera.
 
 **Por qué:** son UI de economía interna (plutonio/caps), no checkout.
 `CurrencyDisplay` lo usan `AccountModal`, `ClanModal` y cuatro componentes de
-clan (Grupo 5); `InsufficientCurrencyDialog` lo usan `HostLobbyModal` y
-`TribesPanel` (Grupo 5). Borrarlos en el Grupo 3 obliga a tocar clanes y el
+clan (Grupo 5); `InsufficientCurrencyDialog` lo usa `HostLobbyModal` para la
+cola paga (Grupo 5g). Borrarlos en el Grupo 3 obliga a tocar clanes y el
 hosting en la misma tarea. El diálogo quedó dismiss-only: ya no enlaza a una
 tienda que no existe.
 
-**Cuándo:** Grupo 5, con la economía de clanes y tribus.
+**Cuándo:** Grupo 5, con la economía de clanes y la cola paga.
 
 ## Terceros que se quedan
 
