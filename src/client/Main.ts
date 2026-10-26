@@ -62,7 +62,6 @@ import {
   SendToggleGameStartTimer,
   SendUpdateGameConfigIntentEvent,
 } from "./LobbyEvents";
-import type { MatchmakingModal, MatchmakingMode } from "./Matchmaking";
 import { modalRouter } from "./ModalRouter";
 import { updateAccountNavButton } from "./NavAccountButton";
 import { initNavigation } from "./Navigation";
@@ -178,8 +177,6 @@ declare global {
     "kick-player": CustomEvent;
     toggle_game_start_timer: CustomEvent;
     "join-changed": CustomEvent;
-    "open-matchmaking": CustomEvent<{ mode?: MatchmakingMode } | undefined>;
-    "matchmaking-requeue": CustomEvent<{ mode?: MatchmakingMode } | undefined>;
     userMeResponse: CustomEvent<UserMeResponse | false>;
     "session-cleared": CustomEvent;
     "leave-lobby": CustomEvent;
@@ -199,7 +196,7 @@ export interface JoinLobbyEvent {
   // A singleplayer game resumed from a saved game: the uncompressed snapshot
   // the engine restores instead of starting fresh from gameStartInfo.
   snapshot?: Uint8Array;
-  source?: "public" | "private" | "host" | "matchmaking" | "singleplayer";
+  source?: "public" | "private" | "host" | "singleplayer";
   publicLobbyInfo?: GameInfo | PublicGameInfo;
   // Watch without playing.
   spectator?: boolean;
@@ -251,7 +248,6 @@ class Client {
   private gameModeSelector: GameModeSelector;
   private userSettings: UserSettings = new UserSettings();
   private tokenLoginModal: TokenLoginModal;
-  private matchmakingModal: MatchmakingModal;
   private mostRecentJoinEvent: number;
   // A join the player has committed to but that has not reached a lobbyHandle
   // yet. `lobbyHandle` alone does not cover this: a public-lobby join awaits
@@ -353,9 +349,8 @@ class Client {
 
     gamePortal.maybeInit();
 
-    // Register modals with the URL router. Lobby modals (join/host) and
-    // matchmaking are intentionally omitted — they own their own URL state
-    // (path-based) or none at all.
+    // Register modals with the URL router. Lobby modals (join/host) are
+    // intentionally omitted — they own their own URL state (path-based).
     modalRouter.register("settings", {
       tag: "user-setting",
       pageId: "page-settings",
@@ -386,10 +381,6 @@ class Client {
     modalRouter.register("single-player", {
       tag: "single-player-modal",
       pageId: "page-single-player",
-    });
-    modalRouter.register("ranked", {
-      tag: "ranked-modal",
-      pageId: "page-ranked",
     });
     modalRouter.register("detailed-view", {
       tag: "detailed-view-modal",
@@ -508,14 +499,6 @@ class Client {
       "update-game-config",
       this.handleUpdateGameConfig.bind(this),
     );
-    document.addEventListener(
-      "open-matchmaking",
-      this.handleOpenMatchmaking.bind(this),
-    );
-    document.addEventListener(
-      "matchmaking-requeue",
-      this.handleMatchmakingRequeue.bind(this),
-    );
 
     const hlpModal = document.querySelector("help-modal") as HelpModal | null;
     if (!hlpModal) {
@@ -552,13 +535,6 @@ class Client {
     ) as TokenLoginModal;
     if (!this.tokenLoginModal) {
       console.warn("Token login modal element not found");
-    }
-
-    this.matchmakingModal = document.querySelector(
-      "matchmaking-modal",
-    ) as MatchmakingModal;
-    if (!this.matchmakingModal) {
-      console.warn("Matchmaking modal element not found");
     }
 
     const onUserMe = async (userMeResponse: UserMeResponse | false) => {
@@ -902,7 +878,6 @@ class Client {
       "language-modal",
       "account-button",
       "token-login",
-      "matchmaking-modal",
       "clan-modal",
       "account-settings-modal",
       "change-username-modal",
@@ -1145,15 +1120,6 @@ class Client {
     if (decodedHash.startsWith("#refresh")) {
       window.location.href = homeHref();
     }
-
-    const requeueMode = this.consumeRequeueUrl();
-    if (requeueMode !== null) {
-      document.dispatchEvent(
-        new CustomEvent("open-matchmaking", {
-          detail: { mode: requeueMode },
-        }),
-      );
-    }
   }
 
   // The lobby modals load on demand (see LazyModals); until one has, it
@@ -1164,35 +1130,6 @@ class Client {
 
   private loadedHostModal(): HostPrivateLobbyModal | null {
     return customElements.get("host-lobby-modal") ? this.hostModal : null;
-  }
-
-  private loadedMatchmakingModal(): MatchmakingModal | null {
-    return customElements.get("matchmaking-modal")
-      ? this.matchmakingModal
-      : null;
-  }
-
-  // Returns the requeue mode ("/?requeue" = 1v1, "/?requeue=2v2" = 2v2,
-  // "/?requeue=ffa" = FFA, "/?requeue=clanwars" = clan wars), or null when
-  // the URL has no requeue param.
-  private consumeRequeueUrl(): MatchmakingMode | null {
-    const searchParams = new URLSearchParams(window.location.search);
-    if (!searchParams.has("requeue")) {
-      return null;
-    }
-    const param = searchParams.get("requeue");
-    const mode =
-      param === "2v2" || param === "ffa" || param === "clanwars"
-        ? param
-        : "1v1";
-
-    searchParams.delete("requeue");
-    const newUrl =
-      window.location.pathname +
-      (searchParams.toString() ? `?${searchParams.toString()}` : "") +
-      window.location.hash;
-    history.replaceState(null, "", newUrl);
-    return mode;
   }
 
   private desktopUpdateState: DesktopUpdateState | null = null;
@@ -1216,12 +1153,8 @@ class Client {
 
   /**
    * The real multiplayer gate. The entry-point components dim their own
-   * buttons, but EVERY join -- theirs, matchmaking's, a deep link, the
-   * host/join modals -- funnels through handleJoinLobby, and most of those
-   * never pass a button. Matchmaking is the sharpest case: it dispatches
-   * join-lobby itself when a match is found, with no click to intercept, so
-   * without this a signed-out player queues, matches, and is closed by the
-   * server with the Turnstile error this whole feature exists to replace.
+   * buttons, but EVERY join -- theirs, a deep link, the host/join modals --
+   * funnels through handleJoinLobby, and most of those never pass a button.
    *
    * The decision itself lives in shouldBlockJoin, which is pure and
    * unit-tested; this adds the shell check, the modal cleanup and the
@@ -1256,20 +1189,6 @@ class Client {
     // client never entered, with the game starting without them.
     this.loadedJoinModal()?.close();
     this.loadedHostModal()?.close();
-    // Matchmaking dispatches its own join once the server matches it, so a
-    // refusal here leaves its modal sitting on "waiting for a game" over a
-    // match that will never be entered. close() is the same teardown its Back
-    // button uses -- it shuts the queue socket and clears the watchdog -- so
-    // the player leaves the queue rather than holding a slot from a screen
-    // that is lying to them. Scoped to the source that owns that modal: a
-    // deep link refused while someone is legitimately queued must not cancel
-    // their queue.
-    if (
-      lobby.source === "matchmaking" &&
-      this.loadedMatchmakingModal()?.isOpen()
-    ) {
-      this.matchmakingModal.close();
-    }
     // false: the web never refuses here any more, so the only feedback left
     // is the desktop status bar's wiggle -- the bar is already showing the
     // update or session reason that refused this join.
@@ -1566,40 +1485,6 @@ class Client {
     }
 
     gamePortal.gameplayStop();
-  }
-
-  // Puts the player back into the ranked queue. From a pre-start match
-  // cancellation the matchmaking modal is still open and rejoins in place,
-  // keeping its mode. From a finished game (WinModal passes the mode) the
-  // page needs the reload teardown, so navigate home with the requeue
-  // param and let consumeRequeueUrl() reopen the queue. A modeless
-  // dispatch with no open modal (the player closed it mid-wait) stays a
-  // no-op — don't force them back into a queue they left.
-  private handleMatchmakingRequeue(
-    event: CustomEvent<{ mode?: MatchmakingMode } | undefined>,
-  ) {
-    if (this.loadedMatchmakingModal()?.requeue()) {
-      return;
-    }
-    const mode = event.detail?.mode;
-    if (mode !== undefined) {
-      window.location.href = mode === "1v1" ? "/?requeue" : `/?requeue=${mode}`;
-    }
-  }
-
-  private handleOpenMatchmaking(
-    event: CustomEvent<{ mode?: MatchmakingMode } | undefined>,
-  ) {
-    if (!this.matchmakingModal) return;
-    whenModalLoaded("matchmaking-modal", () => {
-      // A game that started while it loaded has the screen now, and the
-      // game-start teardown couldn't close a modal that hadn't loaded.
-      if (this.menuTornDown) return;
-      // Always set the mode: dispatchers without a detail (homepage button,
-      // requeue URL) mean 1v1 and must reset a lingering selection.
-      this.matchmakingModal.mode = event.detail?.mode ?? "1v1";
-      this.matchmakingModal.open();
-    });
   }
 
   private handleKickPlayer(event: CustomEvent) {

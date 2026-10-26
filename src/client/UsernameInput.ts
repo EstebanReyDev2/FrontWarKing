@@ -214,7 +214,7 @@ export class UsernameInput extends LitElement {
   // page load.
   private handleClanMembershipChange = (e: Event) => {
     const tag = (e as CustomEvent<{ tag?: string }>).detail?.tag;
-    // Same as a server-side rejection (see Matchmaking). Disbanding counts.
+    // Same as a server-side rejection. Disbanding counts.
     if (CLAN_REMOVED_EVENTS.includes(e.type) && tag) this.clearClanTag(tag);
     // The clan flows invalidate the cache before announcing.
     this.refreshMembership();
@@ -554,7 +554,7 @@ export class UsernameInput extends LitElement {
     // otherwise re-read getUserMe, which after a failed refresh holds a cached
     // false — it would take the player for a member of nothing and reject the
     // very clan they just picked from their own list. The server re-checks the
-    // tag at join either way (see Matchmaking).
+    // tag at join either way.
     if (this.myClans().some((c) => c.tag.toUpperCase() === tag.toUpperCase())) {
       this.clanCheckPending = false;
       this.clanCheck = Promise.resolve(tag);

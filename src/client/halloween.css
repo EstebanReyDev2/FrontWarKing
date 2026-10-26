@@ -250,7 +250,7 @@ body.halloween-theme:not(.in-game) button.bg-malibu-blue:disabled {
   box-shadow: none !important;
 }
 
-/* Secondary Action Buttons - Create Lobby, Ranked, Join Lobby
+/* Secondary Action Buttons - Create Lobby, Join Lobby
    Scoped strictly to .grid-cols-3 so map cards (which also use button.bg-surface) keep their native #0a1628 water color! */
 body.halloween-theme:not(.in-game)
   game-mode-selector

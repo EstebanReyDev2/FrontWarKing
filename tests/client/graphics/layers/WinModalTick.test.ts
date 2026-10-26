@@ -38,6 +38,7 @@ function makeGame(opts: {
   winner: Winner;
   myTeam?: string;
   myClientID?: string;
+  rankedType?: number;
   winnerPlayer?: {
     isPlayer: () => boolean;
     clientID: () => string | null;
@@ -56,7 +57,7 @@ function makeGame(opts: {
     ticks: () => 6000,
     updatesSinceLastTick: () => ({ [GameUpdateType.Win]: [winUpdate] }),
     playerByClientID: () => opts.winnerPlayer,
-    config: () => ({ gameConfig: () => ({ rankedType: undefined }) }),
+    config: () => ({ gameConfig: () => ({ rankedType: opts.rankedType }) }),
   } as unknown as GameView;
 }
 
@@ -204,6 +205,31 @@ describe("WinModal tick win handling", () => {
     actions[1].click();
     await modal!.updateComplete;
     expect(modal!.isVisible).toBe(false);
+  });
+
+  it("never offers requeue for an archived ranked game", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    setup(
+      makeGame({ winner: ["team", "Blue"], myTeam: "Blue", rankedType: 1 }),
+    );
+    document.body.appendChild(modal!);
+    void modal!.show();
+    await modal!.updateComplete;
+
+    const actions = [
+      ...modal!.querySelectorAll<HTMLButtonElement>("[data-win-action]"),
+    ];
+    expect(actions.map((b) => b.getAttribute("data-win-action"))).toEqual([
+      "exit",
+      "keep",
+    ]);
   });
 
   it("ignores a player win whose winner is not a known player", () => {

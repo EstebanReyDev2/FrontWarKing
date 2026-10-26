@@ -10,7 +10,6 @@ import {
   canJoinTrustedLobby,
   lobbyCard,
   mapAspectRatios,
-  trustLockIcon,
   trustRequiredDialog,
   viewerIsSignedIn,
   viewerIsTrusted,
@@ -79,10 +78,10 @@ const TUTORIAL_CARD_MAX_GAMES = 5;
  * begin without that API answering first, because nothing has yet told the
  * client which server to talk to.
  *
- *   GATED (API-dependent): creating/hosting a lobby, entering matchmaking,
- *   opening the join-by-code modal. Each has to resolve a server for
- *   something the client has heard nothing about, so a dead list API really
- *   does mean the click cannot work. These dim, and refuse with
+ *   GATED (API-dependent): creating/hosting a lobby and opening the
+ *   join-by-code modal. Each has to resolve a server for something the
+ *   client has heard nothing about, so a dead list API really does mean the
+ *   click cannot work. These dim, and refuse with
  *   reportMultiplayerRefusal.
  *
  *   NOT GATED (socket-sourced): anything whose target arrived over a live
@@ -272,9 +271,8 @@ export function joinIsGateable(lobby: JoinLobbyEvent): boolean {
  * shouldBlockSocketSourcedAction. Every source that dispatches a join has
  * already reached a server to produce it: "private" only after
  * checkActiveLobby read `exists` from the game's own server, "host" only
- * after createLobby minted the id, "public" from a lobby list arriving over a
- * live server socket, and "matchmaking" only after the queue matched and
- * checkGame confirmed the game exists. The outage signal tracks the separate
+ * after createLobby minted the id, and "public" from a lobby list arriving
+ * over a live server socket. The outage signal tracks the separate
  * server-list API, whose health says nothing about those servers, so refusing
  * here could only reject a join that is already under way. Worst case it
  * ejects a player mid-game: a reload during a list-API blip proves the game
@@ -691,33 +689,13 @@ export class GameModeSelector extends LitElement {
               </div>`
             : nothing}
         </div>
-        <div class="grid grid-cols-3 gap-4 h-14 sm:col-span-2 sm:row-start-4">
+        <div class="grid grid-cols-2 gap-4 h-14 sm:col-span-2 sm:row-start-4">
           ${this.renderSmallActionCard(
             translateText("main.create"),
             this.openHostLobby,
             SECONDARY_ACTION,
             undefined,
             true,
-          )}
-          ${this.renderSmallActionCard(
-            translateText("mode_selector.ranked_title"),
-            this.openRankedMenu,
-            SECONDARY_ACTION,
-            undefined,
-            true,
-            // Ranked admits trusted accounts only. A trusted viewer gets the
-            // green open lock; anyone else meets the red locks and the trust
-            // popup inside the ranked modal. Small, so it clears the label on
-            // narrow (mobile) buttons.
-            this.viewerTrusted
-              ? trustLockIcon(true, {
-                  tooltipTitle: translateText(
-                    "mode_selector.ranked_trust_tooltip_title",
-                  ),
-                  position: "top-1 right-1",
-                  small: true,
-                })
-              : nothing,
           )}
           ${this.renderSmallActionCard(
             translateText("main.join"),
@@ -780,12 +758,12 @@ export class GameModeSelector extends LitElement {
   }
 
   /**
-   * Refuses an API-DEPENDENT action (Create, Ranked, Join by code) and tells
-   * the player why. Returns true when the caller should stop.
+   * Refuses an API-DEPENDENT action (Create, Join by code) and tells the
+   * player why. Returns true when the caller should stop.
    *
    * The reachability half applies here -- see the rule at the top of this
-   * file: none of these three can resolve a server without the list API. A
-   * lobby card goes through blockedFromLobbyJoin below instead.
+   * file: neither can resolve a server without the list API. A lobby card
+   * goes through blockedFromLobbyJoin below instead.
    *
    * Deliberately NOT implemented with the `disabled` attribute the way
    * renderSmallActionCard handles invalid input: a disabled control (and
@@ -825,12 +803,6 @@ export class GameModeSelector extends LitElement {
     reportMultiplayerRefusal(false);
     return true;
   }
-
-  private openRankedMenu = () => {
-    if (this.blockedFromApiAction()) return;
-    if (!this.validateUsername()) return;
-    window.showPage?.("page-ranked");
-  };
 
   private openDetailedView = () => {
     if (!this.validateUsername()) return;
@@ -936,9 +908,9 @@ export class GameModeSelector extends LitElement {
     onClick: () => void,
     bgClass: string = SECONDARY_ACTION,
     badge?: number,
-    // Only the three multiplayer action cards (create/ranked/join) pass this;
-    // the solo card is never gated (see openSinglePlayerModal) and must never
-    // show as disabled here.
+    // Only the multiplayer action cards (create/join) pass this; the solo
+    // card is never gated (see openSinglePlayerModal) and must never show as
+    // disabled here.
     gated: boolean = false,
     adornment: TemplateResult | typeof nothing = nothing,
   ) {

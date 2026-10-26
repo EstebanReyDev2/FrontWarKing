@@ -2,7 +2,6 @@ import { GameID } from "@openfront/engine-api/Schemas";
 import {
   commitsMatch,
   isCommitLike,
-  isSiteLike,
   ownLetterIn,
   pickServerForBuild,
   ServerList,
@@ -198,18 +197,6 @@ export function resetServerList(): void {
 export function serverListSite(): string | undefined {
   if (isDesktopShell()) return ClientEnv.serverHost();
   return ClientEnv.siteHost() ?? window.location.host;
-}
-
-/**
- * The site a ranked join names, so the API pools this page only with game
- * servers registered under the site whose list it reads: the same site the
- * list is fetched for, or undefined when there is none or it is not a name
- * the API would accept (a dev page's `localhost:9000`). See
- * docs/MultiServer.md, "The ranked queue is keyed by site".
- */
-export function matchmakingSite(): string | undefined {
-  const site = safeSite();
-  return site !== undefined && isSiteLike(site) ? site : undefined;
 }
 
 export function serverListUrl(site: string): string {
@@ -528,8 +515,8 @@ export function setServerListInGame(value: boolean): void {
  * Only a page that has never got a list waits: for the fetch already in
  * flight (the page-load one, usually), or for one started here. A page that
  * has no list and whose last attempt just failed does not start another:
- * the heartbeat retries on its own schedule, so a per-second caller (the
- * matchmaking poll) cannot hammer a down API.
+ * the heartbeat retries on its own schedule, so a frequent caller cannot
+ * hammer a down API.
  *
  * The pick prefers an `open` server on this build and falls back to a
  * `draining` one on this build (never a `fenced` one): a player who loaded

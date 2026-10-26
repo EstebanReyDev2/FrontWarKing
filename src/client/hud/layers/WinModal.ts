@@ -1,4 +1,3 @@
-import { RankedType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import type { AllPlayersStats, Winner } from "@openfront/engine-api/Schemas";
 import { EventBus } from "@openfront/shared/EventBus";
@@ -33,9 +32,6 @@ export class WinModal extends LitElement implements Controller {
   @state()
   private isWin = false;
 
-  @state()
-  private isRankedGame = false;
-
   private _title: string;
 
   // Override to prevent shadow DOM creation
@@ -69,14 +65,6 @@ export class WinModal extends LitElement implements Controller {
             () => this._handleExit(),
             "exit",
           )}
-          ${this.isRankedGame
-            ? this.actionButton(
-                "main",
-                translateText("win_modal.requeue"),
-                () => this._handleRequeue(),
-                "requeue",
-              )
-            : null}
           ${this.actionButton(
             "main",
             this.game?.myPlayer()?.isAlive()
@@ -93,8 +81,8 @@ export class WinModal extends LitElement implements Controller {
 
   // The modal's own buttons, textured like the store's tiles and buy buttons:
   // a tinted gradient with a coloured border, and on hover they lift, glow
-  // and a light streak sweeps across. "main" is the blue action (keep playing,
-  // play again); "quiet" is leaving.
+  // and a light streak sweeps across. "main" is the blue action (keep
+  // playing); "quiet" is leaving.
   private actionButton(
     tone: "main" | "quiet",
     label: string,
@@ -282,8 +270,6 @@ export class WinModal extends LitElement implements Controller {
 
   show() {
     gamePortal.gameplayStop();
-    this.isRankedGame =
-      this.game.config().gameConfig().rankedType !== undefined;
     this.isVisible = true;
     this.requestUpdate();
   }
@@ -296,28 +282,6 @@ export class WinModal extends LitElement implements Controller {
   private _handleExit() {
     this.hide();
     window.location.href = homeHref();
-  }
-
-  private _handleRequeue() {
-    this.hide();
-    // Requeue for the same mode; Main owns the mechanism (currently a
-    // reload with the requeue param, which reopens the queue after the
-    // page teardown).
-    const rankedType = this.game.config().gameConfig().rankedType;
-    document.dispatchEvent(
-      new CustomEvent("matchmaking-requeue", {
-        detail: {
-          mode:
-            rankedType === RankedType.TwoVTwo
-              ? ("2v2" as const)
-              : rankedType === RankedType.FreeForAll
-                ? ("ffa" as const)
-                : rankedType === RankedType.ClanWars
-                  ? ("clanwars" as const)
-                  : ("1v1" as const),
-        },
-      }),
-    );
   }
 
   tick() {
@@ -342,7 +306,7 @@ export class WinModal extends LitElement implements Controller {
     };
     winUpdates.forEach((wu) => {
       if (wu.winner === undefined) {
-        // Match cancelled (e.g. a ranked 2v2 that didn't fill or fully
+        // Match cancelled (e.g. a team game that didn't fill or fully
         // spawn): the game ends with no winner. Still vote the result to the
         // server so the record is archived winnerless (never ranked).
         vote(undefined, wu.allPlayersStats);

@@ -288,9 +288,9 @@ describe("ensureServerList", () => {
   });
 
   // With the API 404ing (its rollout has not happened yet) every page is a
-  // page with no list, and Matchmaking's checkGame asks once a second. A
-  // fetch per ask is a self-inflicted DDoS; the heartbeat is the only thing
-  // that should retry, on its own 10s cadence.
+  // page with no list, and frequent callers keep asking. A fetch per ask is
+  // a self-inflicted DDoS; the heartbeat is the only thing that should
+  // retry, on its own 10s cadence.
   it("does not re-fetch for every caller while it has no list", async () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(async () =>

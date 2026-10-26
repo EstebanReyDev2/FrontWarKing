@@ -218,6 +218,39 @@ describe("joinLobby lobby-phase messages", () => {
     expect(loadCachedTerrainMap).toHaveBeenCalledWith("world", "medium");
   });
 
+  it("tears down the lobby on match_cancelled without a requeue listener", () => {
+    const leave = vi.fn();
+    const message = vi.fn();
+    document.addEventListener("leave-lobby", leave);
+    window.addEventListener("show-message", message);
+
+    try {
+      joinLobby(new EventBus(), makeLobbyConfig(false));
+
+      expect(() =>
+        captured.lobbyOnMessage!({
+          type: "error",
+          error: "kick_reason.match_cancelled",
+        }),
+      ).not.toThrow();
+
+      expect(leave).toHaveBeenCalledTimes(1);
+      expect((leave.mock.calls[0][0] as CustomEvent).detail).toEqual({
+        lobby: "game1234",
+        cause: "match-cancelled",
+      });
+      expect(message).toHaveBeenCalledTimes(1);
+      expect((message.mock.calls[0][0] as CustomEvent).detail).toEqual({
+        message: "kick_reason.match_cancelled",
+        color: "red",
+        duration: 5000,
+      });
+    } finally {
+      document.removeEventListener("leave-lobby", leave);
+      window.removeEventListener("show-message", message);
+    }
+  });
+
   it("shows the connection-error modal when start carries no gameStartInfo", async () => {
     const result = joinLobby(new EventBus(), makeLobbyConfig(false));
 

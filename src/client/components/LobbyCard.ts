@@ -37,8 +37,8 @@ export function canJoinTrustedLobby(
   return lobby.gameConfig?.trusted !== true || viewerTrusted;
 }
 
-/** Where the trust popup is shown: a trusted-only lobby, or ranked. */
-export type TrustRequiredContext = "lobby" | "ranked";
+/** Where the trust popup is shown: a trusted-only lobby. */
+export type TrustRequiredContext = "lobby";
 
 const TRUST_REQUIRED_KEYS: Record<
   TrustRequiredContext,
@@ -58,23 +58,14 @@ const TRUST_REQUIRED_KEYS: Record<
     bodySignedOutCrazyGames:
       "public_lobby.trust_required_body_signed_out_crazygames",
   },
-  ranked: {
-    title: "mode_selector.ranked_trust_required_title",
-    body: "mode_selector.ranked_trust_required_body",
-    bodyCrazyGames: "mode_selector.ranked_trust_required_body_crazygames",
-    bodySignedOut: "mode_selector.ranked_trust_required_body_signed_out",
-    bodySignedOutCrazyGames:
-      "mode_selector.ranked_trust_required_body_signed_out_crazygames",
-  },
 };
 
 /**
- * Popup shown instead of attempting to join a trusted-only lobby, or ranked,
- * when the viewer can't get in (the server would refuse them anyway). Tells
- * them how to become trusted rather than letting the join fail: a signed-out
- * viewer is told to sign in first, since trust only attaches to an account.
- * Portals have no purchases, so their variants only suggest playing more
- * games.
+ * Popup shown instead of attempting to join a trusted-only lobby when the
+ * viewer can't get in (the server would refuse them anyway). Tells them how
+ * to become trusted rather than letting the join fail: a signed-out viewer is
+ * told to sign in first, since trust only attaches to an account. Portals
+ * have no purchases, so their variants only suggest playing more games.
  */
 export function trustRequiredDialog(
   signedIn: boolean,

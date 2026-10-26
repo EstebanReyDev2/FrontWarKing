@@ -419,10 +419,10 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
 
   /**
    * OPE-439. The entry-point components dim their own buttons, but every join
-   * -- matchmaking's, a deep link, the host/join modals -- funnels through
-   * handleJoinLobby without passing one, so the funnel gate is the only thing
-   * that covers them. This is a WEB boot (no openfrontDesktop), which is
-   * precisely what the pre-existing desktop gate could not cover.
+   * -- a deep link, the host/join modals -- funnels through handleJoinLobby
+   * without passing one, so the funnel gate is the only thing that covers
+   * them. This is a WEB boot (no openfrontDesktop), which is precisely what
+   * the pre-existing desktop gate could not cover.
    *
    * Driven through the real ServerList module: the reachability the funnel
    * reads has to be the one the heartbeat actually produces.
@@ -485,39 +485,6 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
       ServerList.resetServerList();
     });
 
-    /**
-     * The matchmaking modal's close() is the teardown its Back button uses:
-     * it shuts the queue socket and clears the watchdog. The funnel reaches
-     * for it only when it refuses a matchmade join, so it is also the
-     * sharpest witness that an outage does NOT refuse -- if the funnel had
-     * gated here, a queued player would have been dropped out of the queue.
-     *
-     * Spied rather than driven for real: opening the modal for real would
-     * open a queue WebSocket, and the claim under test is only whether any
-     * join reaches close().
-     */
-    async function spyOnMatchmakingModal(): Promise<{
-      close: ReturnType<typeof vi.spyOn>;
-      restore: () => void;
-    }> {
-      // It loads on demand; spy on the loaded one.
-      await loadModal("matchmaking-modal");
-      const modal = document.querySelector("matchmaking-modal") as unknown as {
-        isOpen: () => boolean;
-        close: () => void;
-      };
-      expect(modal).not.toBeNull();
-      const isOpen = vi.spyOn(modal, "isOpen").mockReturnValue(true);
-      const close = vi.spyOn(modal, "close").mockImplementation(() => {});
-      return {
-        close,
-        restore: () => {
-          close.mockRestore();
-          isOpen.mockRestore();
-        },
-      };
-    }
-
     /** The shape handleJoinLobby expects back; neither promise settles. */
     function stubJoinLobbyReturn(): void {
       mocks.joinLobby.mockReturnValue({
@@ -541,67 +508,28 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
       messages.length = 0;
       mocks.joinLobby.mockClear();
       stubJoinLobbyReturn();
-      const matchmaking = await spyOnMatchmakingModal();
 
-      try {
-        document.dispatchEvent(
-          new CustomEvent("join-lobby", {
-            detail: { gameID: "AbCd1234", source: "private" },
-            bubbles: true,
-          }),
-        );
+      document.dispatchEvent(
+        new CustomEvent("join-lobby", {
+          detail: { gameID: "AbCd1234", source: "private" },
+          bubbles: true,
+        }),
+      );
 
-        // The far edge of the funnel, not the "joining lobby" log: that log
-        // is written BEFORE handleJoinLobby awaits userAuth, the username
-        // seed and the cosmetics refs, so a regression in that tail would
-        // leave a log assertion passing over a join that never happened.
-        await vi.waitFor(() =>
-          expect(mocks.joinLobby).toHaveBeenCalledTimes(1),
-        );
-        // ...and with the lobby that was dispatched, not some other one.
-        expect(mocks.joinLobby.mock.calls[0][1].gameID).toBe("AbCd1234");
-        // No toast either: the funnel refuses nothing, so it has nothing to
-        // report. The dimmed buttons and the status bar still carry the
-        // outage, and a refused BUTTON press still says why -- that half is
-        // covered in ReachabilityGating.
-        expect(messages).not.toContain(
-          translateText("common.backend_unreachable"),
-        );
-        // And nothing tore down the queue behind a player's back.
-        expect(matchmaking.close).not.toHaveBeenCalled();
-      } finally {
-        matchmaking.restore();
-      }
-    });
-
-    it("does not cancel a live matchmaking queue during an outage", async () => {
-      // The same claim on the source that owns that modal: a matchmade join
-      // arriving during an outage is joined, not refused, so the queue
-      // teardown never runs.
-      await settleReachability(false);
-      messages.length = 0;
-      mocks.joinLobby.mockClear();
-      stubJoinLobbyReturn();
-      const matchmaking = await spyOnMatchmakingModal();
-
-      try {
-        document.dispatchEvent(
-          new CustomEvent("join-lobby", {
-            detail: { gameID: "AbCd1234", source: "matchmaking" },
-            bubbles: true,
-          }),
-        );
-
-        await vi.waitFor(() =>
-          expect(mocks.joinLobby).toHaveBeenCalledTimes(1),
-        );
-        expect(matchmaking.close).not.toHaveBeenCalled();
-        expect(messages).not.toContain(
-          translateText("common.backend_unreachable"),
-        );
-      } finally {
-        matchmaking.restore();
-      }
+      // The far edge of the funnel, not the "joining lobby" log: that log
+      // is written BEFORE handleJoinLobby awaits userAuth, the username
+      // seed and the cosmetics refs, so a regression in that tail would
+      // leave a log assertion passing over a join that never happened.
+      await vi.waitFor(() => expect(mocks.joinLobby).toHaveBeenCalledTimes(1));
+      // ...and with the lobby that was dispatched, not some other one.
+      expect(mocks.joinLobby.mock.calls[0][1].gameID).toBe("AbCd1234");
+      // No toast either: the funnel refuses nothing, so it has nothing to
+      // report. The dimmed buttons and the status bar still carry the
+      // outage, and a refused BUTTON press still says why -- that half is
+      // covered in ReachabilityGating.
+      expect(messages).not.toContain(
+        translateText("common.backend_unreachable"),
+      );
     });
 
     it("lets the same join through once the backend answers", async () => {
@@ -616,7 +544,7 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
 
       document.dispatchEvent(
         new CustomEvent("join-lobby", {
-          detail: { gameID: "AbCd1234", source: "matchmaking" },
+          detail: { gameID: "AbCd1234", source: "private" },
           bubbles: true,
         }),
       );

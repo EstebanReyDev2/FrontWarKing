@@ -1,8 +1,4 @@
-import {
-  GameMode,
-  GameType,
-  RankedType,
-} from "@openfront/engine-api/game/GameTypes";
+import { GameMode, GameType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -301,7 +297,6 @@ export class HeadsUpMessage extends LitElement implements Controller {
         ${this.game?.inSpawnPhase() &&
         !this.game.config().isReplay() &&
         !this.game.config().isIntentionalSpectator() &&
-        this.game.config().gameConfig().rankedType !== RankedType.OneVOne &&
         this.game.config().gameConfig().gameMode === GameMode.FFA &&
         this.game.config().gameConfig().gameType === GameType.Public &&
         !this.hasClosedCollusionWarning
