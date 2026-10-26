@@ -782,13 +782,6 @@
     "unit_voluntarily_deleted": "Unit voluntarily deleted",
     "wants_to_renew_alliance": "{name} wants to renew your alliance"
   },
-  "featured_stream": {
-    "expand": "Expand",
-    "hide_today": "Hide for today",
-    "live": "LIVE",
-    "minimize": "Minimize",
-    "open_on_twitch": "Open {channel} on Twitch"
-  },
   "friends": {
     "accept": "Accept",
     "add_friend": "Add Friend",
@@ -1938,12 +1931,6 @@
     "tribes_purchase_description": "Your name gets assigned to a bot tribe in real multiplayer games. It goes live right away.",
     "tribes_purchase_heading": "Buy a Tribe Name",
     "your_tribes_heading": "Your Tribe Names"
-  },
-  "streaming_now": {
-    "live_count": "{count} Streaming",
-    "title": "Streaming Now",
-    "viewers": "{count} watching",
-    "watch": "Watch {name}"
   },
   "team_colors": {
     "blue": "Blue",

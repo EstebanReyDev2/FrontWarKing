@@ -1,4 +1,4 @@
-import type { NewsItem, StreamsFeed } from "@openfront/shared/ApiSchemas";
+import type { NewsItem } from "@openfront/shared/ApiSchemas";
 import {
   GetMyTribeNamesResponse,
   GetMyTribeNamesResponseSchema,
@@ -30,7 +30,6 @@ import {
   RankedLeaderboardResponseSchema,
   SteamFinalizeResponseSchema,
   SteamOrderResolution,
-  StreamsFeedSchema,
   TribeLeaderboardResponse,
   TribeLeaderboardResponseSchema,
   TribeStatsResponse,
@@ -45,7 +44,6 @@ import {
   GameInfo,
 } from "@openfront/shared/WireSchemas";
 import newsItemsFallback from "resources/news.json";
-import streamsFallback from "resources/streams.json";
 import { z } from "zod";
 import { getApiBase, getAudience } from "./ApiBase";
 import {
@@ -1709,8 +1707,6 @@ export async function markNoticeSeen(notice: string): Promise<boolean> {
   }
 }
 
-
-
 // GET /api/game/:id on the game server (worker) — whether the game is a
 // publicly listed lobby. False on any failure: callers use this to hide
 // host powers that the server blocks in listed games anyway, so the safe
@@ -2074,8 +2070,7 @@ export async function getNews(): Promise<NewsItem[]> {
 
 // Fetch an API-served JSON config (news.json-style: served file + bundled fallback).
 // Any error, non-200, or invalid payload falls back, parsed through the same schema so
-// the fallback is validated too. The timeout guards recurring callers (StreamsFeed polls
-// every 60s) from a fetch that never settles.
+// the fallback is validated too. The timeout guards recurring callers from a fetch that never settles.
 async function getServedConfig<T>(
   name: string,
   schema: z.ZodType<T>,
@@ -2100,13 +2095,4 @@ async function getServedConfig<T>(
     console.warn(`${name}: request failed, using fallback`, err);
     return schema.parse(fallback);
   }
-}
-
-// The single verified-live feed behind both homepage streaming features (API-hosted JSON
-// + bundled fallback). Every entry has already been confirmed live server-side, so
-// callers render what this returns without probing Twitch or YouTube themselves.
-//
-// Fails closed: any error, non-200, or legacy payload lands on the bundled empty feed.
-export async function getStreams(): Promise<StreamsFeed> {
-  return getServedConfig("streams.json", StreamsFeedSchema, streamsFallback);
 }

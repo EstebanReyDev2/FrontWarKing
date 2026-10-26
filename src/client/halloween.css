@@ -366,9 +366,8 @@ body.halloween-theme:not(.in-game)
   }
 }
 
-/* --- News Banner & Streaming Now (Homepage) --- */
-body.halloween-theme:not(.in-game) news-box > div,
-body.halloween-theme:not(.in-game) streaming-now > div {
+/* --- News Banner (Homepage) --- */
+body.halloween-theme:not(.in-game) news-box > div {
   background-color: var(--hw-purple-translucent) !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur(8px) !important;
@@ -376,11 +375,7 @@ body.halloween-theme:not(.in-game) streaming-now > div {
 
 body.halloween-theme:not(.in-game) news-box a:hover,
 body.halloween-theme:not(.in-game) news-box .text-xs a,
-body.halloween-theme:not(.in-game) news-modal a,
-body.halloween-theme:not(.in-game)
-  streaming-now
-  a:hover
-  .group-hover\:text-blue-300 {
+body.halloween-theme:not(.in-game) news-modal a {
   color: var(--hw-orange) !important;
 }
 

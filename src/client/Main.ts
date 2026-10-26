@@ -42,7 +42,6 @@ import {
   isDesktopShell,
   type DesktopUpdateState,
 } from "./DesktopShell";
-import "./FeaturedStream";
 import { loadGameClient, prefetchGameClient } from "./GameClientLoader";
 import "./GameModeSelector";
 import {
@@ -1521,7 +1520,7 @@ class Client {
 
     this.lobbyHandle.prestart.then(() => {
       // The game is actually starting now (lobby wait is over). Let listeners that stay up
-      // through the wait (e.g. the featured-stream panel) hide at this point instead of on join.
+      // through the wait hide at this point instead of on join.
       this.menuTornDown = true;
       document.dispatchEvent(new CustomEvent("game-starting"));
       // Earliest point the lobby is provably closed: the server has stopped

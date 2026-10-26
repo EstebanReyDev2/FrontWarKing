@@ -1339,53 +1339,6 @@ export const NewsItemSchema = z.object({
 });
 export type NewsItem = z.infer<typeof NewsItemSchema>;
 
-// https-only URL: a plain URL check would accept javascript:/http: URLs, and these flow
-// into href/src, so restrict the scheme (the config is served, but this fails an injected
-// entry closed rather than rendering it).
-const HttpsUrlSchema = z.url({ protocol: /^https$/ });
-
-// One verified-live stream in the homepage streaming features. Produced only by the
-// API's cron (Twitch Helix; YouTube RSS + videos.list) and served by GET /streams.json.
-// `channel` is the login/handle used to derive the watch URL when `url` is absent;
-// image/link fields are validated so a malformed entry fails the feed closed.
-//
-// `startedAt` is required on purpose. It can only come from a live lookup, so a payload
-// built from static config cannot satisfy this schema — which means an API still serving
-// the older {enabled, channels} shape fails validation and falls back to "show nothing",
-// rather than being mistaken for a current one. Liveness is never decided on the client.
-export const LiveStreamSchema = z.object({
-  platform: z.enum(["twitch", "youtube"]),
-  // Login/handle as it appears in the watch URL (twitch.tv/<login>, youtube.com/@handle).
-  // One conservative charset for both platforms — no slashes, queries, or whitespace — so
-  // an entry can't smuggle path/query segments into the derived URL.
-  channel: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^@?[A-Za-z0-9._-]+$/, "invalid channel handle"),
-  displayName: z.string().min(1).max(100),
-  title: z.string().max(200).optional(),
-  viewers: z.number().int().nonnegative().default(0),
-  avatarUrl: HttpsUrlSchema.optional(),
-  url: HttpsUrlSchema.optional(),
-  startedAt: z.iso.datetime(),
-});
-export type LiveStream = z.infer<typeof LiveStreamSchema>;
-
-// The single served feed (GET /streams.json). `featured` is the embed candidate list in
-// admin priority order; `live` is the "Streaming Now" list sorted by viewers.
-//
-// There is no `enabled` flag: an empty array means "show nothing". An overloaded toggle
-// is exactly what made the old payload ambiguous — it meant "configured" in one API
-// version and "live" in the next, with an identical shape. `verifiedAt` is when the API
-// built the feed, so the client can refuse one the edge served long after the cron died.
-export const StreamsFeedSchema = z.object({
-  verifiedAt: z.iso.datetime(),
-  featured: z.array(LiveStreamSchema).default([]),
-  live: z.array(LiveStreamSchema).default([]),
-});
-export type StreamsFeed = z.infer<typeof StreamsFeedSchema>;
-
 // ---------------------------------------------------------------------------
 // POST /payments/checkout — the single, rail-agnostic checkout endpoint that
 // replaced the two legacy Stripe-only ones. It serves both the Stripe (web)
