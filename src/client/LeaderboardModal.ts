@@ -9,18 +9,10 @@ import type {
   LeaderboardPlayerList,
   PlayerLadder,
 } from "./components/leaderboard/LeaderboardPlayerList";
-import "./components/leaderboard/LeaderboardTribeTable";
-import type { LeaderboardTribeTable } from "./components/leaderboard/LeaderboardTribeTable";
 import { modalHeader } from "./components/ui/ModalHeader";
 import { translateText } from "./Utils";
 
-const TAB_KEYS = [
-  "players",
-  "players2v2",
-  "playersFfa",
-  "clans",
-  "tribes",
-] as const;
+const TAB_KEYS = ["players", "players2v2", "playersFfa", "clans"] as const;
 
 // Tab key -> ladder. "players" predates the 2v2 ladder and stays the 1v1 tab
 // so existing `#modal=leaderboard&tab=players` links keep working. The ladder
@@ -42,8 +34,6 @@ export class LeaderboardModal extends BaseModal {
   private playerList?: LeaderboardPlayerList;
   @query("leaderboard-clan-table")
   private clanTable?: LeaderboardClanTable;
-  @query("leaderboard-tribe-table")
-  private tribeTable?: LeaderboardTribeTable;
 
   private loadToken = 0;
   private lastRankedType: PlayerLadder = RankedType.OneVOne;
@@ -64,7 +54,6 @@ export class LeaderboardModal extends BaseModal {
           label: translateText("leaderboard_modal.ranked_ffa_tab"),
         },
         { key: "clans", label: translateText("leaderboard_modal.clans_tab") },
-        { key: "tribes", label: translateText("leaderboard_modal.tribes_tab") },
       ],
     };
   }
@@ -76,7 +65,7 @@ export class LeaderboardModal extends BaseModal {
   private tabComponent(tab: string) {
     if (this.rankedTypeFor(tab) !== null) return this.playerList;
     if (tab === "clans") return this.clanTable;
-    return this.tribeTable;
+    return undefined;
   }
 
   protected onOpen(): void {
@@ -153,10 +142,7 @@ export class LeaderboardModal extends BaseModal {
             ${translateText("leaderboard_modal.title")}
           </span>
           ${this.activeTab === "clans" ? dateRange : ""}
-          ${this.rankedTypeFor(this.activeTab) !== null ||
-          this.activeTab === "tribes"
-            ? refreshTime
-            : ""}
+          ${this.rankedTypeFor(this.activeTab) !== null ? refreshTime : ""}
         </div>
       `,
       onBack: () => this.close(),
@@ -180,9 +166,6 @@ export class LeaderboardModal extends BaseModal {
             event: CustomEvent<{ start: string; end: string }>,
           ) => this.handleClanDateRangeChange(event)}
         ></leaderboard-clan-table>
-        <leaderboard-tribe-table
-          class=${this.activeTab === "tribes" ? "h-full" : "hidden"}
-        ></leaderboard-tribe-table>
       </div>
     `;
   }

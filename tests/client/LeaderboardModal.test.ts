@@ -67,23 +67,6 @@ vi.mock("../../src/client/Api", async () => {
       }
       return res.json();
     }),
-    // Mirrors the real fetchTribeLeaderboard: page 1, plus page 2 only when
-    // page 1 came back exactly full.
-    fetchTribeLeaderboard: vi.fn(async () => {
-      const load = async (page: number) => {
-        const url = new URL(`${getApiBase()}/leaderboard/tribes`);
-        url.searchParams.set("page", String(page));
-        const res = await fetch(url.toString(), {
-          headers: { Accept: "application/json" },
-        });
-        return res.ok ? res.json() : false;
-      };
-      const first = await load(1);
-      if (first === false || first.tribes.length < 50) return first;
-      const second = await load(2);
-      if (second === false) return first;
-      return { ...first, tribes: [...first.tribes, ...second.tribes] };
-    }),
   };
 });
 
@@ -118,14 +101,6 @@ beforeEach(() => {
       }
       if (url.includes("/leaderboard/ranked")) {
         return jsonRes({ "1v1": [], "2v2": [] });
-      }
-      if (url.includes("/leaderboard/tribes")) {
-        return jsonRes({
-          windowDays: 30,
-          start: "2026-06-27",
-          end: "2026-07-27",
-          tribes: [],
-        });
       }
       return jsonRes({}, false, 404);
     }),
@@ -645,9 +620,9 @@ describe("LeaderboardModal", () => {
     });
 
     it("selects the 2v2 ladder from its tab", async () => {
-      // The tab click also prefetches the clan and tribe tabs, so route by
-      // URL: a blanket resolved value would feed them ladder-shaped JSON and
-      // crash their renders after the test ends.
+      // The tab click also prefetches the clan tab, so route by URL: a
+      // blanket resolved value would feed it ladder-shaped JSON and crash its
+      // render after the test ends.
       (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
         async (input: any) => {
           const url =

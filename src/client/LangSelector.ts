@@ -276,7 +276,6 @@ export class LangSelector extends LitElement {
       "ranking-controls",
       "leaderboard-modal",
       "token-login",
-      "tribes-panel",
       "tutorial-panel",
     ];
 
