@@ -6,9 +6,6 @@ vi.mock("../../src/client/Api", () => ({
   getUserMe: vi.fn(async () => false),
   invalidateUserMe: vi.fn(),
 }));
-vi.mock("../../src/client/ClanApi", () => ({
-  checkClanTagOwnership: vi.fn(async (tag: string) => ({ tag, error: null })),
-}));
 vi.mock("../../src/client/CrazyGamesSDK", () => ({
   crazyGamesSDK: {
     isOnCrazyGames: () => false,

@@ -7,14 +7,13 @@ import { whenPageIdle } from "./WhenPageIdle";
  * load it before opening one, and prefetchModals loads them all in the
  * background once the page has loaded, so a click rarely waits on one.
  *
- * Modals that open each other (the account, clan, profile and game-stats
- * views) import each other, so a handoff between them never waits.
+ * Modals that open each other (the account, profile and game-stats views)
+ * import each other, so a handoff between them never waits.
  */
 const modules: Record<string, () => Promise<unknown>> = {
   "account-modal": () => import("./AccountModal"),
   "account-settings-modal": () => import("./AccountSettingsModal"),
   "change-username-modal": () => import("./ChangeUsernameModal"),
-  "clan-modal": () => import("./ClanModal"),
   "detailed-view-modal": () => import("./components/DetailedGameViewModal"),
   "game-stats-modal": () => import("./GameStatsModal"),
   "help-modal": () => import("./HelpModal"),

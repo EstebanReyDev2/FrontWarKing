@@ -95,11 +95,6 @@ export class MobileNavBar extends LitElement {
           data-page="page-play"
           data-i18n="main.play"
         ></button>
-        <button
-          class="no-game-portal ${MOBILE_ITEM}"
-          data-page="page-clan"
-          data-i18n="main.clans"
-        ></button>
         <div
           class="flex flex-col w-full mt-auto [.in-game_&]:hidden items-end justify-end pt-4 border-t border-white/10"
         ></div>

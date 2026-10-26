@@ -55,7 +55,6 @@ const profile = {
   createdAt: "2026-01-01T00:00:00.000Z",
   username: "Wonder",
   stats: { Public: {} },
-  clans: [],
 };
 
 describe("public profile page", () => {
@@ -155,13 +154,13 @@ describe("public profile page", () => {
     });
 
     it("opens on the tab ?tab= names, and writes tab changes back to it", async () => {
-      await openFromPath("/player/aB3dE5fX?tab=clans");
+      await openFromPath("/player/aB3dE5fX?tab=games");
       await settle(() =>
-        expect(modal.textContent).toContain("player_profile.no_clans"),
+        expect(modal.querySelector("player-game-history-view")).not.toBeNull(),
       );
 
-      modal.setActiveTab("games");
-      expect(url()).toBe("/player/aB3dE5fX?tab=games");
+      modal.setActiveTab("stats");
+      expect(url()).toBe("/player/aB3dE5fX?tab=stats");
       expect(window.location.hash).toBe("");
     });
 
@@ -198,8 +197,8 @@ describe("public profile page", () => {
       expect(url()).toBe("/#modal=profile&publicID=other123");
 
       // Tab changes land on the new player's URL, not the old path.
-      modal.setActiveTab("clans");
-      expect(url()).toBe("/#modal=profile&publicID=other123&tab=clans");
+      modal.setActiveTab("stats");
+      expect(url()).toBe("/#modal=profile&publicID=other123&tab=stats");
 
       // And the not-found panel doesn't name the old player's link.
       await settle(() =>
@@ -211,8 +210,8 @@ describe("public profile page", () => {
     it("moves the hash on to another player's profile opened over this one", async () => {
       modal.open({ publicID: "aB3dE5fX" });
       expect(url()).toBe("/#modal=profile&publicID=aB3dE5fX");
-      modal.open({ publicID: "other123", tab: "clans" });
-      expect(url()).toBe("/#modal=profile&publicID=other123&tab=clans");
+      modal.open({ publicID: "other123", tab: "games" });
+      expect(url()).toBe("/#modal=profile&publicID=other123&tab=games");
     });
 
     it("leaves the URL alone when the same profile is reopened", async () => {

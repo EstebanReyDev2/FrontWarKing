@@ -158,34 +158,4 @@ describe("public player profile route", () => {
     });
     expect(fetchPublicPlayerProfileMock).not.toHaveBeenCalled();
   });
-
-  it("hands back to the clan modal when opened from a clan", async () => {
-    fetchPublicPlayerProfileMock.mockResolvedValue({
-      createdAt: "2026-01-01T00:00:00.000Z",
-      stats: statsTree,
-    });
-    // The clan modal decides which tab to restore (Members vs Game History)
-    // via returnFromPlayerProfile — the profile modal just hands back to it.
-    const returnFromPlayerProfile = vi.fn();
-    const fakeClanModal = document.createElement(
-      "clan-modal",
-    ) as HTMLElement & {
-      returnFromPlayerProfile: () => void;
-    };
-    fakeClanModal.returnFromPlayerProfile = returnFromPlayerProfile;
-    document.body.appendChild(fakeClanModal);
-
-    modal.openFromClan("clan-member");
-    await modal.updateComplete;
-    expect(modal.isOpen()).toBe(true);
-
-    const backButton = modal.querySelector(
-      '[slot="header"] button',
-    ) as HTMLButtonElement;
-    backButton.click();
-
-    expect(modal.isOpen()).toBe(false);
-    expect(returnFromPlayerProfile).toHaveBeenCalled();
-    fakeClanModal.remove();
-  });
 });

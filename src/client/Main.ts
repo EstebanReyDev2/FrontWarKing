@@ -355,7 +355,6 @@ class Client {
       tag: "user-setting",
       pageId: "page-settings",
     });
-    modalRouter.register("clan", { tag: "clan-modal", pageId: "page-clan" });
     modalRouter.register("account", {
       tag: "account-modal",
       pageId: "page-account",
@@ -878,7 +877,6 @@ class Client {
       "language-modal",
       "account-button",
       "token-login",
-      "clan-modal",
       "account-settings-modal",
       "change-username-modal",
       "lang-selector",

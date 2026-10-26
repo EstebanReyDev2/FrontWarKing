@@ -11,7 +11,7 @@ export class GameStatsModal extends BaseModal {
   protected routerName = "stats";
 
   @state() private gameId: string | null = null;
-  private openedFrom: "account" | "clan" | "profile" | null = null;
+  private openedFrom: "account" | "profile" | null = null;
   // Whose profile the game was opened from, when opened from a profile.
   private profilePublicId: string | null = null;
 
@@ -65,12 +65,6 @@ export class GameStatsModal extends BaseModal {
     this.open({ gameID: gameId });
   }
 
-  public openFromClan(gameId: string): void {
-    this.openedFrom = "clan";
-    this.profilePublicId = null;
-    this.open({ gameID: gameId });
-  }
-
   // `profilePublicId` is whose profile the game was listed on: the player's
   // own profile counts as their own history.
   public openFromProfile(gameId: string, profilePublicId?: string): void {
@@ -92,12 +86,6 @@ export class GameStatsModal extends BaseModal {
           "player-profile-modal",
         )
         ?.returnToGames();
-    } else if (openedFrom === "clan") {
-      document
-        .querySelector<HTMLElement & { returnToGameHistory(): void }>(
-          "clan-modal",
-        )
-        ?.returnToGameHistory();
     }
   }
 }

@@ -4,7 +4,6 @@ import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { translateText } from "../client/Utils";
 import { getUserMe, invalidateUserMe } from "./Api";
-import { checkClanTagOwnership } from "./ClanApi";
 import { verifiedBadge } from "./components/ui/VerifiedBadge";
 import { gamePortal } from "./GamePortal";
 import { showInGameAlert, showInGameConfirm } from "./InGameModal";
@@ -165,9 +164,7 @@ export class UsernameInput extends LitElement {
   private _isValid: boolean = true;
   private _lastValidatedLang: string | null = null;
 
-  // Latest in-flight ownership check. `clanCheckGen` discards stale results so
-  // only the most recent keystroke updates the UI / resolves the submit value.
-  private clanCheckGen = 0;
+  // Resolves the submit value from the most recent keystroke.
   private clanCheck: Promise<string | null> = Promise.resolve(null);
 
   // Same guard for the profile: an uncached picker refresh and a clan-event
@@ -541,34 +538,13 @@ export class UsernameInput extends LitElement {
   }
 
   private startClanCheck() {
-    const gen = ++this.clanCheckGen;
     const tag = this.clanTag;
     this.clanTagOwnershipError = "";
     this.emitValidity();
-    if (tag.length === 0 || !validateClanTag(tag).isValid) {
-      this.clanCheckPending = false;
-      this.clanCheck = Promise.resolve(null);
-      return;
-    }
-    // Membership already in hand answers this. checkClanTagOwnership would
-    // otherwise re-read getUserMe, which after a failed refresh holds a cached
-    // false — it would take the player for a member of nothing and reject the
-    // very clan they just picked from their own list. The server re-checks the
-    // tag at join either way.
-    if (this.myClans().some((c) => c.tag.toUpperCase() === tag.toUpperCase())) {
-      this.clanCheckPending = false;
-      this.clanCheck = Promise.resolve(tag);
-      return;
-    }
-    this.clanCheckPending = true;
-    this.clanCheck = checkClanTagOwnership(tag).then((res) => {
-      if (gen === this.clanCheckGen) {
-        this.clanTagOwnershipError = res.error ?? "";
-        this.clanCheckPending = false;
-        this.emitValidity();
-      }
-      return res.tag;
-    });
+    this.clanCheckPending = false;
+    this.clanCheck = Promise.resolve(
+      tag.length > 0 && validateClanTag(tag).isValid ? tag : null,
+    );
   }
 
   connectedCallback() {

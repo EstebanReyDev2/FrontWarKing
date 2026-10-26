@@ -1,7 +1,7 @@
 import type { UserMeResponse } from "@openfront/shared/ApiSchemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── Mocks (mirrors tests/client/clan/ClanModalTestUtils.ts factories) ──────
+// ─── Mocks ───────────────────────────────────────────────────────────────
 
 vi.mock("../../src/client/Api", () => ({
   getUserMe: vi.fn(async () => false as const),
@@ -99,9 +99,8 @@ describe("AccountModal — rendering", () => {
   });
 
   // Directly install a resolved userMeResponse and flip off the loading state,
-  // bypassing onOpen()'s network calls — this mirrors ClanModalTestUtils'
-  // setState() helper, but userMeResponse is a plain private field (not a Lit
-  // @state), so we force a render manually afterward.
+  // bypassing onOpen()'s network calls. userMeResponse is a plain private field
+  // (not a Lit @state), so we force a render manually afterward.
   async function setLoggedInUser(userMe: UserMeResponse): Promise<void> {
     (
       modal as unknown as { userMeResponse: UserMeResponse | null }
