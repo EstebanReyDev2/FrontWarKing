@@ -1,5 +1,8 @@
 import { EventBus } from "@openfront/shared/EventBus";
-import { ServerMessage } from "@openfront/shared/WireSchemas";
+import {
+  ClientJoinMessageSchema,
+  ServerMessage,
+} from "@openfront/shared/WireSchemas";
 import {
   createGameWireContext,
   decodeClientMessage,
@@ -171,6 +174,19 @@ describe("Transport send paths", () => {
     transports.push(made.transport);
     return { ...made, ws: handshake(made.transport) };
   }
+
+  describe("join", () => {
+    it("sends a valid null clanTag when none is configured", async () => {
+      const made = makeTransport({ turnstileToken: null });
+      transports.push(made.transport);
+      const ws = handshake(made.transport);
+      await made.transport.joinGame();
+      const join = decodeFrames(ws)[0];
+
+      expect(join).toMatchObject({ type: "join", clanTag: null });
+      expect(ClientJoinMessageSchema.safeParse(join).success).toBe(true);
+    });
+  });
 
   describe("intents", () => {
     it("turns bus intent events into intent frames the server can decode", () => {

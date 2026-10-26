@@ -15,7 +15,7 @@ import {
 const teams = [ColoredTeams.Red, ColoredTeams.Blue];
 
 describe("assignTeams", () => {
-  const createPlayer = (id: string, clan?: string): PlayerInfo => {
+  const createPlayer = (id: string, clan?: string | null): PlayerInfo => {
     return new PlayerInfo(
       `Player ${id}`,
       PlayerType.Human,
@@ -32,7 +32,7 @@ describe("assignTeams", () => {
   const createPlayerWithFriends = (
     id: string,
     friends: string[],
-    clan?: string,
+    clan?: string | null,
     clientID: string = id,
   ): PlayerInfo => {
     return new PlayerInfo(
@@ -57,6 +57,22 @@ describe("assignTeams", () => {
     const result = assignTeams(players, teams, false);
 
     // Check that players are assigned alternately
+    expect(result.get(players[0])).toEqual(ColoredTeams.Red);
+    expect(result.get(players[1])).toEqual(ColoredTeams.Blue);
+    expect(result.get(players[2])).toEqual(ColoredTeams.Red);
+    expect(result.get(players[3])).toEqual(ColoredTeams.Blue);
+  });
+
+  it("should assign players when every clanTag is null and friends are empty", () => {
+    const players = [
+      createPlayerWithFriends("1", [], null),
+      createPlayerWithFriends("2", [], null),
+      createPlayerWithFriends("3", [], null),
+      createPlayerWithFriends("4", [], null),
+    ];
+
+    const result = assignTeams(players, teams, false);
+
     expect(result.get(players[0])).toEqual(ColoredTeams.Red);
     expect(result.get(players[1])).toEqual(ColoredTeams.Blue);
     expect(result.get(players[2])).toEqual(ColoredTeams.Red);

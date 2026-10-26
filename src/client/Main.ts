@@ -1251,9 +1251,9 @@ class Client {
     const auth = await userAuth(!isSingleplayer);
     const playerRole = auth !== false ? (auth.claims.role ?? null) : null;
     // Ensure the one-shot Steam name-seed has settled before reading
-    // getUsername(), mirroring how getClanCheck() runs in parallel with the
-    // handshake. whenSeeded() always resolves (falling back to the generated
-    // anon name on failure/timeout), so this can only delay, never block.
+    // getUsername(). whenSeeded() always resolves (falling back to the
+    // generated anon name on failure/timeout), so this can only delay, never
+    // block.
     await this.usernameInput?.whenSeeded();
     // One resolution for the whole join: the name and the verified badge have
     // to describe the same decision, so they are read together rather than
@@ -1281,8 +1281,7 @@ class Client {
       }),
       turnstileToken: await this.getTurnstileToken(lobby),
       playerName: resolvedName.name,
-      playerClanTag: this.usernameInput?.getClanTag() ?? null,
-      clanTagCheck: this.usernameInput?.getClanCheck(),
+      playerClanTag: null,
       playerRole,
       gameStartInfo:
         lobby.gameStartInfo ??

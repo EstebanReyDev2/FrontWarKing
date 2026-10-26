@@ -203,9 +203,9 @@ body.halloween-theme:not(.in-game)
   color: #ffffff !important;
 }
 
-/* Modals & Panels (clean, flush outer border without orange edge; excludes clan tag dropdown & in-game HUD) */
+/* Modals & Panels (clean, flush outer border without orange edge; excludes in-game HUD) */
 body.halloween-theme:not(.in-game) .page-content > div,
-body.halloween-theme:not(.in-game) [role="dialog"]:not(#clan-tag-menu) > div {
+body.halloween-theme:not(.in-game) [role="dialog"] > div {
   background-color: var(--hw-purple-translucent) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.8) !important;
 }

@@ -1098,7 +1098,7 @@ export class SinglePlayerModal extends BaseModal {
       finalMaxTimerValue = Math.max(1, Math.min(120, this.maxTimerValue));
     }
 
-    await this.launch(async ({ resolvedName, cosmetics }, usernameInput) => {
+    await this.launch(async ({ resolvedName, cosmetics }) => {
       console.log(
         `Starting single player game with map: ${GameMapType[this.selectedMap as keyof typeof GameMapType]}${this.useRandomMap ? " (Randomly selected)" : ""}`,
       );
@@ -1112,7 +1112,7 @@ export class SinglePlayerModal extends BaseModal {
             {
               clientID,
               username: resolvedName.name,
-              clanTag: usernameInput?.getClanTag() ?? null,
+              clanTag: null,
               cosmetics,
             },
           ],
@@ -1189,7 +1189,7 @@ export class SinglePlayerModal extends BaseModal {
   private async startSavedGame(id: string, shared: boolean) {
     if (this.starting) return;
     try {
-      await this.launch(async ({ resolvedName, cosmetics }, usernameInput) => {
+      await this.launch(async ({ resolvedName, cosmetics }) => {
         const snapshot = await downloadSavedGame(id, shared);
         if (typeof snapshot === "string") {
           throw new SavedGameLoadError(
@@ -1230,7 +1230,7 @@ export class SinglePlayerModal extends BaseModal {
                 // the clientID its intents carry.
                 clientID: human.clientID,
                 username: resolvedName.name,
-                clanTag: usernameInput?.getClanTag() ?? null,
+                clanTag: null,
                 cosmetics,
               },
             ],
