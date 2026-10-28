@@ -13,14 +13,15 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 2 · Portales (CrazyGames, Poki, Steam)                    | Hecho               | `1cfcedc25`, `3bbd90009`                                                                               |
 | 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                                               |
 | 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1`                           |
-| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Parcial (5a-5f)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082`, `fa8cfbf1b`, `5c6e243bc` |
+| 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Hecho (5a-5g)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082`, `fa8cfbf1b`, `5c6e243bc`, `1dc1c0815`, `fc149b20b` |
 | 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                                                      |
 
 ### Cómo se verifica cada grupo
 
-La línea base actual son **81 fallos estables y 0 flaky**, todos originados en
-`spawnSync bash/sh ENOENT` al correr los tests de los scripts de despliegue en
-Windows. Cualquier otro nombre que falle es una regresión.
+La línea base actual son **81 fallos estables y 2 flaky conocidos**, todos
+originados en `spawnSync bash/sh ENOENT` al correr los tests de los scripts de
+despliegue en Windows. Los dos flaky son `MainInitialize` y `ReplayFormat`;
+cualquier otro nombre que falle es una regresión.
 
 Para cerrar un grupo:
 
@@ -106,8 +107,9 @@ Pruebas manuales con `npm run dev` (Vite en 9000 y server en 3000/3001/3002):
   `#modal=account&tab=friends` abre la cuenta normal.
 - Los modales de host y join no contienen `Invite Friends`.
 - La consola no muestra `Translation key not found` ni errores de módulos
-  borrados. Sólo aparece el ruido esperado de `localhost:8787` que se documenta
-  más abajo.
+  borrados **en las pantallas recorridas por este smoke**. No se abrieron
+  historial ni ranking; ver la corrección del smoke de 5f más abajo. Sólo
+  aparece el ruido esperado de `localhost:8787` que se documenta más abajo.
 
 ### Resultado del Bloque 2 (5d y 5e)
 
@@ -149,9 +151,11 @@ nuevos. Typecheck, lint y formato en 0.
 `fa8cfbf1b` borró la UI de clanes (`ClanModal`, `ClanApi`, los 15 componentes de
 `components/clan`, el router, `LazyModals`, la navegación, `page-clan` y las
 claves `clan_modal.*`, `main.clans`, `account_modal.tab_clans` y
-`player_profile.no_clans`). Para que ese commit compilara, también se quitó de
-`UsernameInput` el chequeo de pertenencia a clan, que era el último consumidor
-de `ClanApi`; el selector siguió existiendo hasta 5f-2.
+`player_profile.no_clans`). La auditoría posterior encontró que 27 claves
+`clan_modal.*` seguían vivas en historial y ranking; se restauraron en
+`1463f534f`. Para que ese commit compilara, también se quitó de `UsernameInput`
+el chequeo de pertenencia a clan, que era el último consumidor de `ClanApi`; el
+selector siguió existiendo hasta 5f-2.
 
 `5c6e243bc` quitó el selector de clan tag de `UsernameInput` (`getClanTag`,
 `getClanCheck`, `clearClanTag`, eventos, `page-clan` y `localStorage.clanTag`),
@@ -214,16 +218,38 @@ casilla y se tacha el nombre.
       `<clan-modal id="page-clan">` de `index.html`~~ — `fa8cfbf1b`
 - [x] ~~Tabs y orígenes de clanes en `PlayerProfileModal`, `GameStatsModal`,
       `AccountModal` y sus tests~~ — `fa8cfbf1b`
-- [x] ~~Claves `clan_modal.*`, `main.clans`, `account_modal.tab_clans` y
-      `player_profile.no_clans` de `en.json`~~ — `fa8cfbf1b`
+- [x] ~~Claves `clan_modal.*` huérfanas, `main.clans`,
+      `account_modal.tab_clans` y `player_profile.no_clans` de `en.json`~~ —
+      `fa8cfbf1b`. La auditoría posterior encontró 27 claves `clan_modal.*` que
+      seguían vivas en historial y ranking; se restauraron en `1463f534f`.
 - [x] ~~Selector de clan tag, `getClanTag`, `getClanCheck`, `clearClanTag`,
       eventos de clan y `localStorage.clanTag` en `UsernameInput`~~ — `5c6e243bc`
-- [x] ~~`playerClanTag` de `Main` y `clanTagCheck` de `ClientGameRunner`; el join
-      ahora manda `clanTag: null`~~ — `5c6e243bc`
+- [x] ~~`clanTagCheck` de `ClientGameRunner`; el join ahora manda
+      `clanTag: null`~~ — `5c6e243bc`. `playerClanTag` sigue en `LobbyConfig`,
+      `Transport`, `LocalServer` y `GameView`, pero es inerte: `Main.ts` lo pasa
+      siempre como `null`.
 - [x] ~~Claves `username.clan_*`, `username.tag` y `username.tag_not_member` de
       `en.json`; regla `#clan-tag-menu` de `halloween.css`~~ — `5c6e243bc`.
       Se conservan `username.tag_too_short`, `tag_too_long` y
       `tag_invalid_chars` porque `validateClanTag` sigue existiendo.
+
+### 5g · Economía interna muerta: currency display y cola paga — hecho
+
+Aprobado como hecho por el usuario; se dividió en dos commits.
+
+- [x] ~~`CurrencyDisplay`, `CapIcon`, `BottleCapIcon.svg`, sus estilos y la
+      clave `cosmetics.soft`; `AccountModal` ya no muestra el saldo de caps~~ —
+      `1dc1c0815`
+- [x] ~~Cola paga de lobby: `HostLobbyModal`, `InsufficientCurrencyDialog`,
+      `PlutoniumIcon`, `PlutoniumIcon.svg`, helpers de `Cosmetics.ts` y las
+      claves `cosmetics.hard`, `lobby_modal.queue*` y
+      `store.insufficient_currency*`~~ — `fc149b20b`
+- [x] ~~Tests de la UI borrada; se agregaron casos de arranque del host y de
+      `MainInitialize`~~ — `fc149b20b`
+
+Después de 5g, `lobbyQueue` sólo sobrevive en `CosmeticSchemas` (y sus tests de
+schema); el cliente no lo lee ni lo muestra. `queueLobby` quedó huérfana en
+`Api.ts` y se lista como deuda del Grupo 6.
 
 ### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
@@ -330,9 +356,10 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 
 ### Restos que no son de este grupo
 
-- [ ] `src/client/components/CurrencyDisplay.ts` — Grupo 5 (lo usa `AccountModal`)
-- [ ] `src/client/components/InsufficientCurrencyDialog.ts` — Grupo 5g (host y cola paga)
-- [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder` — Grupo 6
+- [x] ~~`src/client/components/CurrencyDisplay.ts`~~ — 5g (`1dc1c0815`)
+- [x] ~~`src/client/components/InsufficientCurrencyDialog.ts`~~ — 5g (`fc149b20b`)
+- [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder`,
+      `queueLobby` — Grupo 6
 
 ## Deuda para Fase 2
 
@@ -365,17 +392,17 @@ el juego debe arrancar igual. Hay que verificar también que una URL inexistente
 en Vercel no devuelva el `index.html`: un fallback SPA haría pasar un 404 por un
 catálogo válido.
 
-### Campos y schemas que sobreviven a los Bloques 1, 2 y 3
+### Campos y schemas que sobreviven a 5a-5g
 
-Estos nombres no se tocaron en 5a-5f. La columna "estado" dice qué queda vivo
+Estos nombres no se tocaron en 5a-5g. La columna "estado" dice qué queda vivo
 hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
 
-| Nombre           | Dónde queda                                                               | Estado después de los Bloques 1, 2 y 3                                                           | Cuándo se va |
+| Nombre           | Dónde queda                                                               | Estado tras 5g                                                                                   | Cuándo se va |
 | ---------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------ |
 | `friends`        | `WireSchemas`, `ApiSchemas`, `SharedUtil`, `engine-api`, snapshots        | Campo inerte en el cliente: la UI ya no lo lee. Sigue en el wire y en `TeamAssignment`.          | Fase 2       |
 | `GroupToken`     | `WireSchemas` (`GroupTokenEvent`, mensajes de lobby/start)                | El cliente ya no lo emite ni lo consume; el evento y el schema siguen por el netcode.            | Fase 2       |
 | `tribeNames`     | `CosmeticSchemas`                                                         | Sin consumidores tras borrar la tienda de tribus. El schema queda para no tocar el contrato.     | Fase 2       |
-| `lobbyQueue`     | `CosmeticSchemas`, `HostLobbyModal`                                       | Todavía vivo: el host muestra el precio de la cola paga (5g).                                    | 5g y Fase 2  |
+| `lobbyQueue`     | `CosmeticSchemas` (sólo el schema)                                        | Inerte en el cliente tras 5g: el host ya no muestra ni cobra la cola paga. Se conserva para no tocar el contrato. | Fase 2       |
 | `clanTag`        | `engine-api`, `engine`, `WireSchemas`, `ApiSchemas` y estado determinista | El cliente ya no lo lee de `localStorage` ni envía uno propio: el join manda `null`.             | Fase 2       |
 | `RankedType`     | `engine-api`, `engine`, `ApiSchemas` y stats del cliente                  | Sin UI ni cola ranked en el cliente tras 5e; sigue para el check de victoria del engine.         | Fase 2       |
 | `ClanApiSchemas` | `src/server/PrivilegeRefresher.ts`                                        | Sólo `ReservedClanTagsResponseSchema`; el resto queda inerte.                                    | Fase 2       |
@@ -384,6 +411,30 @@ hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
 `TeamAssignment` quedó cubierto por `tests/TeamAssignment.test.ts` con todos los
 `clanTag` en `null` y `friends` vacío, y se prueba además en la partida por
 equipos contra bots del smoke test del Bloque 3.
+
+### Cola paga y textos de clan en historial/stats
+
+- `queueLobby` quedó huérfana en `src/client/Api.ts` después de `fc149b20b`.
+  No se borra en Fase 1 porque el recorte de `Api.ts` es del Grupo 6; se va con
+  ese recorte o en Fase 2.
+- Las vistas de historial y stats siguen usando textos `clan_modal.*` aunque el
+  juego ya no tenga clanes: `PlayerGameHistoryView.ts`, `GameHistoryDates.ts`,
+  `GameTypeLabels.ts` y `PlayerRow.ts`. Los textos funcionan y están
+  restaurados, pero en Fase 2 hay que decidir si esas etiquetas siguen teniendo
+  sentido sin clanes o si pasan a un namespace de historial general.
+
+## Deuda de Grupo 6
+
+- `src/client/Api.ts`: `queueLobby` quedó sin consumidor en el cliente tras
+  borrar la cola paga (`fc149b20b`). Recortarla junto con el resto de `Api.ts`.
+- Revisar si las vistas de historial/stats que usan claves `clan_modal.*`
+  (`PlayerGameHistoryView`, `GameHistoryDates`, `GameTypeLabels`, `PlayerRow`)
+  tienen sentido sin clanes, o si hay que mover esas etiquetas a un namespace
+  de historial general.
+- `createPaymentsCheckout`, `finalizeSteamOrder` y sus tipos siguen en `Api.ts`
+  sin consumidores.
+- `ClientEnv.stripePublishableKey()` y el bootstrap de Stripe en
+  `index.html`/`RenderHtml`/`ServerEnv` siguen sin consumidor.
 
 ## Contratos del engine y del netcode
 
@@ -619,14 +670,38 @@ Abrí `http://localhost:9000`.
    termine. Los equipos se reparten sin errores y el juego termina.
 5. **Perfil y stats.** El perfil y el modal de stats no tienen tabs ni links de
    clanes; Back no intenta volver a un clan.
-6. **Consola.** No aparece `Translation key not found` por claves de clan, ni
-   `Failed to fetch dynamically imported module` por `ClanModal` o
-   `components/clan`. El ruido de `8787` sigue siendo el documentado abajo.
+6. **Consola.** No aparece `Failed to fetch dynamically imported module` por
+   `ClanModal` o `components/clan`. **Corrección:** este smoke no abrió
+   historial ni ranking. Esas vistas sí mostraban `Translation key not found`
+   porque `fa8cfbf1b` había borrado 27 claves `clan_modal.*` que seguían en uso.
+   Se restauraron en `1463f534f` y el test nuevo
+   `tests/TranslationKeyUsage.test.ts` cubre las claves estáticas. El ruido de
+   `8787` sigue siendo el documentado abajo.
 
-Resultado de la prueba real (26/10/2026): partida **Teams** en Pangaea compacto
-(500×500), 3 bots, dificultad Easy, jugada en Chromium headless hasta el final.
-El humano quedó en el equipo Red y ganó en el tick 1116 con todos los enemigos
-eliminados; no hubo errores de equipos ni de clanes en la partida.
+Resultado del smoke automatizado (26/10/2026): partida **Teams** en Pangaea
+compacto (500×500), 3 bots, dificultad Easy, jugada en Chromium **headless**
+hasta el final. No es una prueba manual humana; queda pendiente repetirla a mano
+en un navegador real. El humano quedó en el equipo Red y ganó en el tick 1116 con
+todos los enemigos eliminados; no hubo errores de equipos ni de clanes en la
+partida.
+
+### Smoke test del Bloque 4 (5g)
+
+```
+npm run dev
+```
+
+Abrí `http://localhost:9000`.
+
+1. **Cuenta.** El menú de cuenta no muestra el saldo de caps ni
+   `CurrencyDisplay`; el resto de la cuenta sigue abriendo.
+2. **Host Lobby.** El modal de host no tiene "Queue", precio en Plutonio,
+   "Pay and queue" ni el diálogo de moneda insuficiente. Crear un lobby normal
+   sigue funcionando.
+3. **Consola.** No aparecen errores de módulos `CurrencyDisplay`,
+   `InsufficientCurrencyDialog` ni `PlutoniumIcon`, ni
+   `Translation key not found` por `lobby_modal.queue*`,
+   `store.insufficient_currency*` o `cosmetics.soft`/`cosmetics.hard`.
 
 ### `window.adsEnabled`
 
@@ -703,18 +778,17 @@ No afecta al repo ni a la rama; es sólo basura local de la verificación.
 **Por qué:** era una constante pura sin lógica de pago. 4b-2 borró su último
 consumidor, así que no quedaba nada que la leyera.
 
-### `CurrencyDisplay` e `InsufficientCurrencyDialog`
+### `CurrencyDisplay` e `InsufficientCurrencyDialog` se borraron
 
-- `src/client/components/CurrencyDisplay.ts`
-- `src/client/components/InsufficientCurrencyDialog.ts`
+- `CurrencyDisplay` — 5g (`1dc1c0815`).
+- `InsufficientCurrencyDialog` — 5g (`fc149b20b`).
 
-**Por qué:** son UI de economía interna (plutonio/caps), no checkout.
-`CurrencyDisplay` lo usa `AccountModal`; `InsufficientCurrencyDialog` lo usa
-`HostLobbyModal` para la cola paga (5g). Borrarlos en el Grupo 3 obliga a tocar
-la cuenta y el hosting en la misma tarea. El diálogo quedó dismiss-only: ya no
-enlaza a una tienda que no existe.
+**Por qué:** eran UI de economía interna (plutonio/caps), no checkout.
+`CurrencyDisplay` lo usaba `AccountModal`; `InsufficientCurrencyDialog` lo usaba
+`HostLobbyModal` para la cola paga. Con la cuenta sin saldo visible y la cola
+paga eliminada, no quedaba ningún consumidor.
 
-**Cuándo:** 5g y Fase 2, con la cola paga y el recorte de cuenta.
+**Cuándo:** hecho.
 
 ## Terceros que se quedan
 
@@ -748,9 +822,9 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   del proyecto original.
 - Los `window.PageOS` / analytics de terceros que aparezcan dentro de
   `src/client` (revisar en Fase 2).
-- `src/client/Api.ts` conserva `createPaymentsCheckout`, `finalizeSteamOrder` y
-  sus tipos, ya sin consumidores en el cliente. Se van con el recorte de `Api.ts`
-  (Grupo 6) o con la reescritura del netcode.
+- `src/client/Api.ts` conserva `createPaymentsCheckout`, `finalizeSteamOrder`,
+  `queueLobby` y sus tipos, ya sin consumidores en el cliente. Se van con el
+  recorte de `Api.ts` (Grupo 6) o con la reescritura del netcode.
 - `ClientEnv.stripePublishableKey()` y el bloque `stripePublishableKey` de
   `index.html`/`RenderHtml`/`ServerEnv` quedaron sin consumidor al borrar
   `StripeInline`. Son config del bootstrap; se van con el recorte de `Api.ts` o

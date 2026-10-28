@@ -4,12 +4,6 @@
 # Tests that failed in just one run are in baseline-flaky.txt.
 # Format: <test file> > <full test name>
 
-tests/client/InventoryModal.test.ts > InventoryModal explains guest access across inventory categories and opens sign-in
-tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (a) shows the total, the level change and each source at its base value
-tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (b) without a level-up, shows the level and the progress through it
-tests/client/ProfileCard.test.ts > <profile-card> shows the name, clan, prestige and level, the XP bar and lifetime XP
-tests/client/ProgressionModals.test.ts > player profile level shows another player's level from the public endpoint
-tests/client/RewardTrack.test.ts > <reward-track> end card tags the next rank's exclusive inside the card
 tests/DeployIdentity.test.ts > deploy.sh identity keeps a standalone prod deployment's page on its own name
 tests/DeployIdentity.test.ts > deploy.sh identity keeps the bare container name for any other explicit game host
 tests/DeployIdentity.test.ts > deploy.sh identity passes an explicit letter and worker count through
