@@ -1,9 +1,7 @@
-import type { NewsItem } from "@openfront/shared/ApiSchemas";
 import {
   IdentityTokenAudiencesResponseSchema,
   IdentityTokenResponse,
   IdentityTokenResponseSchema,
-  NewsItemSchema,
   PlayerGameModeFilter,
   PlayerGameTypeFilter,
   PlayerProfile,
@@ -21,7 +19,6 @@ import {
   ArchivedAnalyticsRecordSchema,
   GameInfo,
 } from "@openfront/shared/WireSchemas";
-import newsItemsFallback from "resources/news.json";
 import { z } from "zod";
 import { getApiBase, getAudience } from "./ApiBase";
 import {
@@ -597,31 +594,6 @@ export async function updateUsername(
   }
 }
 
-export async function markNoticeSeen(notice: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${getApiBase()}/users/@me/notices`, {
-      method: "POST",
-      headers: {
-        Authorization: await getAuthHeader(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ notice }),
-    });
-    if (!response.ok) {
-      console.error(
-        "markNoticeSeen: request failed",
-        response.status,
-        response.statusText,
-      );
-      return false;
-    }
-    return true;
-  } catch (e) {
-    console.error("markNoticeSeen: request failed", e);
-    return false;
-  }
-}
-
 // GET /api/game/:id on the game server (worker) — whether the game is a
 // publicly listed lobby. False on any failure: callers use this to hide
 // host powers that the server blocks in listed games anyway, so the safe
@@ -676,32 +648,6 @@ export async function setLobbyListed(
     };
   } catch (e) {
     console.error("setLobbyListed: request failed", e);
-    return { ok: false };
-  }
-}
-
-// POST /api/game/:id/queue on the game server — the host of a listed lobby
-// pays plutonium to put it in the public Special queue. The worker charges
-// through the API with the host's token. On failure, `error` is the server's
-// code when available ("insufficient_balance", "queue_payment_failed", ...).
-export async function queueLobby(
-  gameID: string,
-): Promise<{ ok: true } | { ok: false; error?: string }> {
-  try {
-    await ensureServerList();
-    const token = await getPlayToken();
-    const response = await fetch(
-      `${ClientEnv.gameHttpBase(gameID)}/${ClientEnv.gameWorkerPath(gameID)}/api/game/${gameID}/queue`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-    if (response.ok) return { ok: true };
-    const body = await response.json().catch(() => null);
-    return { ok: false, error: body?.error };
-  } catch (e) {
-    console.error("queueLobby: request failed", e);
     return { ok: false };
   }
 }
@@ -850,31 +796,9 @@ export async function fetchGameById(
   }
 }
 
-export async function getNews(): Promise<NewsItem[]> {
-  try {
-    const res = await fetch(`${getApiBase()}/news.json`, {
-      headers: { Accept: "application/json" },
-    });
-    if (res.status !== 200) {
-      console.warn("getNews: unexpected status", res.status);
-      return newsItemsFallback as NewsItem[];
-    }
-    const json = await res.json();
-    const parsed = z.array(NewsItemSchema).safeParse(json);
-    if (!parsed.success) {
-      console.warn("getNews: Zod validation failed", parsed.error);
-      return newsItemsFallback as NewsItem[];
-    }
-    return parsed.data;
-  } catch (err) {
-    console.warn("getNews: request failed, using fallback", err);
-    return newsItemsFallback as NewsItem[];
-  }
-}
-
-// Fetch an API-served JSON config (news.json-style: served file + bundled fallback).
-// Any error, non-200, or invalid payload falls back, parsed through the same schema so
-// the fallback is validated too. The timeout guards recurring callers from a fetch that never settles.
+// Fetch an API-served JSON config with a bundled fallback. Any error, non-200,
+// or invalid payload falls back, parsed through the same schema so the fallback
+// is validated too. The timeout guards recurring callers from a fetch that never settles.
 async function getServedConfig<T>(
   name: string,
   schema: z.ZodType<T>,
