@@ -14,7 +14,7 @@ Rama: `fase-1-limpieza`, desde `main` (`6b9933ea6`).
 | 3 · Pagos y monetización                                  | Hecho               | `fb7d7e0a1`, `04f1cd5a6`                                                                               |
 | 4 · Progresión comercial y cosméticos                     | Hecho (4a, 4b y 4c) | `4652d4751`, `781ffb17c`, `85f8dc8d4`, `e9995885e`, `107d40ab5`, `cf37651a1`                           |
 | 5 · Social (clanes, ranked, leaderboards, Twitch, amigos) | Hecho (5a-5g)     | `76f4892e5`, `e1b4a66c5`, `ccc006f55`, `b851ca0d6`, `58c7fcddd`, `204503082`, `fa8cfbf1b`, `5c6e243bc`, `1dc1c0815`, `fc149b20b` |
-| 6 · Recorte de `Api.ts`                                   | Pendiente           | —                                                                                                      |
+| 6 · Recorte de `Api.ts`                                   | Hecho (G6-1 a G6-3) | `787ba8b1d`, `8a175f244`, `df931bbd0`                                                                  |
 
 ### Cómo se verifica cada grupo
 
@@ -249,7 +249,7 @@ Aprobado como hecho por el usuario; se dividió en dos commits.
 
 Después de 5g, `lobbyQueue` sólo sobrevive en `CosmeticSchemas` (y sus tests de
 schema); el cliente no lo lee ni lo muestra. `queueLobby` quedó huérfana en
-`Api.ts` y se lista como deuda del Grupo 6.
+`Api.ts` y se borró en G6-3.
 
 ### 4a · Progresión en partida, badges de nivel y cuenta — hecho
 
@@ -358,8 +358,8 @@ la ruta de display. El detalle de tests y claves está en el reporte del grupo.
 
 - [x] ~~`src/client/components/CurrencyDisplay.ts`~~ — 5g (`1dc1c0815`)
 - [x] ~~`src/client/components/InsufficientCurrencyDialog.ts`~~ — 5g (`fc149b20b`)
-- [ ] `src/client/Api.ts` — `createPaymentsCheckout`, `finalizeSteamOrder`,
-      `queueLobby` — Grupo 6
+- [x] ~~`src/client/Api.ts` — pagos, creator codes, `queueLobby`,
+      `getNews` y `markNoticeSeen`~~ — G6-1, G6-2 y G6-3
 
 ## Deuda para Fase 2
 
@@ -412,29 +412,35 @@ hoy, para no confundir "sin consumidor en el cliente" con "se puede borrar ya":
 `clanTag` en `null` y `friends` vacío, y se prueba además en la partida por
 equipos contra bots del smoke test del Bloque 3.
 
-### Cola paga y textos de clan en historial/stats
+### G6-4 · Bootstrap de Stripe (no se hace en Fase 1)
 
-- `queueLobby` quedó huérfana en `src/client/Api.ts` después de `fc149b20b`.
-  No se borra en Fase 1 porque el recorte de `Api.ts` es del Grupo 6; se va con
-  ese recorte o en Fase 2.
-- Las vistas de historial y stats siguen usando textos `clan_modal.*` aunque el
-  juego ya no tenga clanes: `PlayerGameHistoryView.ts`, `GameHistoryDates.ts`,
-  `GameTypeLabels.ts` y `PlayerRow.ts`. Los textos funcionan y están
-  restaurados, pero en Fase 2 hay que decidir si esas etiquetas siguen teniendo
-  sentido sin clanes o si pasan a un namespace de historial general.
+G6-4 quedó fuera de la Fase 1. Sacar `ClientEnv.stripePublishableKey()` y el
+bloque `stripePublishableKey` de `index.html` obliga a tocar también
+`src/server/RenderHtml.ts`, `src/server/ServerEnv.ts` y el tipo de
+`packages/shared/src/configuration/Env.ts`. Como `src/server` no se toca en esta
+fase, se resuelve en Fase 2 o con una autorización explícita. Mientras tanto el
+bootstrap sigue inyectándose pero no tiene consumidor en el cliente.
+
+### Textos de clan en historial/stats
+
+Las vistas de historial y stats siguen usando textos `clan_modal.*` aunque el
+juego ya no tenga clanes: `PlayerGameHistoryView.ts`, `GameHistoryDates.ts`,
+`GameTypeLabels.ts` y `PlayerRow.ts`. Los textos funcionan y están restaurados,
+pero en Fase 2 hay que decidir si esas etiquetas siguen teniendo sentido sin
+clanes o si pasan a un namespace de historial general.
 
 ## Deuda de Grupo 6
 
-- `src/client/Api.ts`: `queueLobby` quedó sin consumidor en el cliente tras
-  borrar la cola paga (`fc149b20b`). Recortarla junto con el resto de `Api.ts`.
+- G6-4 (bootstrap de Stripe) queda pendiente para Fase 2; requiere tocar
+  `src/server` y `packages/shared`.
+- Los schemas compartidos de creator codes (`PublicCreatorSchema`,
+  `PutCreatorResponseSchema`) y noticias (`NewsItemSchema`) siguen en
+  `packages/shared/src/ApiSchemas.ts` con sus tests de schema, aunque el cliente
+  ya no los usa. Se conservan como contrato.
 - Revisar si las vistas de historial/stats que usan claves `clan_modal.*`
   (`PlayerGameHistoryView`, `GameHistoryDates`, `GameTypeLabels`, `PlayerRow`)
   tienen sentido sin clanes, o si hay que mover esas etiquetas a un namespace
   de historial general.
-- `createPaymentsCheckout`, `finalizeSteamOrder` y sus tipos siguen en `Api.ts`
-  sin consumidores.
-- `ClientEnv.stripePublishableKey()` y el bootstrap de Stripe en
-  `index.html`/`RenderHtml`/`ServerEnv` siguen sin consumidor.
 
 ## Contratos del engine y del netcode
 
@@ -822,12 +828,10 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   del proyecto original.
 - Los `window.PageOS` / analytics de terceros que aparezcan dentro de
   `src/client` (revisar en Fase 2).
-- `src/client/Api.ts` conserva `createPaymentsCheckout`, `finalizeSteamOrder`,
-  `queueLobby` y sus tipos, ya sin consumidores en el cliente. Se van con el
-  recorte de `Api.ts` (Grupo 6) o con la reescritura del netcode.
 - `ClientEnv.stripePublishableKey()` y el bloque `stripePublishableKey` de
   `index.html`/`RenderHtml`/`ServerEnv` quedaron sin consumidor al borrar
-  `StripeInline`. Son config del bootstrap; se van con el recorte de `Api.ts` o
-  con Fase 2.
+  `StripeInline`. Son config del bootstrap; G6-4 los deja para Fase 2.
+- Los schemas compartidos de creator codes y noticias siguen con sus tests de
+  schema aunque el cliente ya no los use.
 - `src/server` conserva los endpoints de pago; son server, no entran en la
   limpieza del cliente. Fase 2.
