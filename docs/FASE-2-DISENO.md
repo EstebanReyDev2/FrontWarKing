@@ -368,11 +368,11 @@ class TurnMaker {
   constructor(opts: {
     term: number;
     hostID: ClientID;
-    intervalMs: number;       // 200
     turnsPerBatch: number;    // 2
     maxIntentsPerTurn: number;// 64
-    clock: TurnClock;         // Worker en producción, falso en tests
+    clock: TurnClock;         // WorkerTurnClock(200) en producción; falso en tests
     sink: TurnSink;
+    ctx: ZbContext;           // mismo roster que TurnReceiver
     isLeaseValid: () => boolean;
     onLeaseLost?: () => void;
   });
