@@ -835,3 +835,27 @@ el juego sin arranque (el boot consulta la sesión antes de mostrar nada).
   schema aunque el cliente ya no los use.
 - `src/server` conserva los endpoints de pago; son server, no entran en la
   limpieza del cliente. Fase 2.
+
+## Verificación de `RenderHtml` y la carpeta `static/`
+
+Los tests de `tests/server/RenderHtml.test.ts` requieren que **no exista**
+`static/` en la raíz del repo. `static/` es la salida de `npm run build-prod`,
+está ignorada por git y no es parte del código fuente.
+
+Verificación del 2026-10-29, con `static/` presente:
+
+- `tests/server/RenderHtml.test.ts` fallaba en
+  `RenderHtml environment-only render still emits every guarded line, in place,
+  when the locals are supplied`.
+- La suite completa daba 6480 pasados, 82 fallados y 1 pendiente.
+
+Después de borrar `static/` con `Remove-Item static -Recurse -Force`:
+
+- `npx vitest run tests/server/RenderHtml.test.ts` pasó 29/29.
+- La suite completa dio **6481 pasados, 81 fallados y 1 pendiente**, que
+  coincide exactamente con `docs/baseline-failures.txt` y
+  `docs/baseline-flaky.txt`.
+
+No es una regresión de Fase 1 ni de F2a: el fallo aparece porque el test lee un
+directorio de build generado. Si volvés a correr `npm run build-prod`, borrá
+`static/` antes de ejecutar la suite completa.
