@@ -33,10 +33,10 @@ describe("EventRateLimiter", () => {
     const limiter = new EventRateLimiter({
       capacity: 10,
       refillPerSecond: 10,
+      now: () => 0,
     });
     await limiter.acquire(6);
-    expect(limiter.available).toBeGreaterThanOrEqual(3.9);
-    expect(limiter.available).toBeLessThanOrEqual(4);
+    expect(limiter.available).toBe(4);
   });
 
   it("rejects a single cost larger than the bucket", async () => {

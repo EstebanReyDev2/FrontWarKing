@@ -49,6 +49,8 @@ import {
   ToggleRenderDebugGuiEvent,
 } from "./InputHandler";
 
+import type { RealtimeTransport } from "./netcode/RealtimeTransport";
+import type { TurnClock } from "./netcode/TurnClock";
 import { pagePin } from "./PagePin";
 import {
   applyGraphicsOverrides,
@@ -127,6 +129,18 @@ export interface LobbyConfig {
   // Host only: the play token the lobby was created under, used for the
   // first join so the host joins as the creator (see createLobby).
   creatorToken?: string;
+  // The Phase 2 realtime path. It is opt-in so singleplayer, replays and the
+  // existing WebSocket lobbies keep their current behaviour.
+  realtime?: {
+    clientID: string;
+    hostID: string;
+    transport?: RealtimeTransport;
+    allowGeneralHello?: boolean;
+    term?: number;
+    // Tests inject a manual clock; production leaves it undefined and gets
+    // WorkerTurnClock.
+    clock?: TurnClock;
+  };
 }
 
 export interface JoinLobbyResult {

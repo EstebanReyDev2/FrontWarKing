@@ -30,7 +30,7 @@ import {
   parseClaimPromptStore,
   runBootInterrupt,
 } from "./BootInterrupts";
-import type { JoinLobbyResult } from "./ClientGameRunner";
+import type { JoinLobbyResult, LobbyConfig } from "./ClientGameRunner";
 import { getPlayerCosmeticsRefs } from "./Cosmetics";
 import { subscribeDesktopSessionRecovery } from "./DesktopSessionRecovery";
 import {
@@ -67,6 +67,7 @@ import { updateAccountNavButton } from "./NavAccountButton";
 import { initNavigation } from "./Navigation";
 import { capturePagePin } from "./PagePin";
 import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
+import { mountRealtimeDev } from "./RealtimeDev";
 import {
   ensureServerList,
   redirectToGameVersion,
@@ -202,6 +203,9 @@ export interface JoinLobbyEvent {
   spectator?: boolean;
   // Host only: the play token the lobby was created under (see createLobby).
   creatorToken?: string;
+  // Phase 2 dev path. Undefined keeps the existing WebSocket/local paths
+  // untouched.
+  realtime?: LobbyConfig["realtime"];
 }
 
 /**
@@ -498,6 +502,9 @@ class Client {
       "update-game-config",
       this.handleUpdateGameConfig.bind(this),
     );
+
+    // Opt-in only; a normal boot returns false without touching the DOM.
+    mountRealtimeDev();
 
     const hlpModal = document.querySelector("help-modal") as HelpModal | null;
     if (!hlpModal) {
@@ -1170,6 +1177,9 @@ class Client {
    * do.
    */
   private blockedJoin(lobby: JoinLobbyEvent): boolean {
+    // The realtime dev room has no public lobby, no Turnstile gate and no
+    // server-list entry to wait for. It is explicitly opt-in via the URL.
+    if (lobby.realtime !== undefined) return false;
     const desktop = isDesktopShell();
     if (
       !shouldBlockJoin(
@@ -1236,7 +1246,7 @@ class Client {
       });
     }
     // Only update URL immediately for private lobbies, not public ones
-    if (lobby.source !== "public") {
+    if (lobby.source !== "public" && lobby.realtime === undefined) {
       this.updateJoinUrlForShare(lobby.gameID);
     }
     // Singleplayer runs entirely locally, and the session is only used here
@@ -1294,6 +1304,7 @@ class Client {
       snapshot: lobby.snapshot,
       spectator: lobby.spectator,
       creatorToken: lobby.creatorToken,
+      realtime: lobby.realtime,
     });
 
     if (this.mostRecentJoinEvent !== event.timeStamp) {
@@ -1511,6 +1522,7 @@ class Client {
   private async getTurnstileToken(
     lobby: JoinLobbyEvent,
   ): Promise<string | null> {
+    if (lobby.realtime !== undefined) return null;
     if (
       ClientEnv.env() === GameEnv.Dev ||
       isDesktopShell() ||

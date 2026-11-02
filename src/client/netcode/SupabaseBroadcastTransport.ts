@@ -108,6 +108,7 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
   private reconnectAttempts = 0;
   private closed = false;
   private detaching = false;
+  private suppressConnected = false;
   private lastRateLimitLogAt = Number.NEGATIVE_INFINITY;
   private lastState: TransportState = { status: "connecting" };
 
@@ -179,7 +180,16 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
   }
 
   async broadcast(packet: Omit<TransportPacket, "to">): Promise<void> {
-    const routes = this.routes(packet, []);
+    const routes =
+      packet.kind === "control" && packet.control?.type === "hello"
+        ? [
+            {
+              topic: this.baseTopic,
+              event: "hello",
+              payload: encodeControl(packet.control),
+            },
+          ]
+        : this.routes(packet, []);
     const cost = Math.max(1, this.subscribedClients.size);
     await this.rateLimiter.acquire(cost);
     for (const route of routes) {
@@ -281,6 +291,7 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
         }
       });
       for (const event of [
+        "hello",
         "host_heartbeat",
         "host_claim",
         "host_elected",
@@ -295,6 +306,17 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
 
     if (inTopic) {
       const clientID = topic.slice(`${this.baseTopic}:in:`.length);
+      channel.on("broadcast", { event: "intent" }, ({ payload }) => {
+        const bytes = toBytes(payload);
+        if (bytes !== null) {
+          this.dispatch({
+            kind: "intent",
+            from: clientID,
+            to: this.hostID,
+            bytes,
+          });
+        }
+      });
       for (const event of ["hello", "ack", "history_req"]) {
         channel.on("broadcast", { event }, ({ payload }) => {
           this.onControlPayload(event, clientID, this.hostID, payload);
@@ -362,10 +384,15 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
         });
         return;
       }
+      // A peer announces itself on the general channel before the host has
+      // subscribed to its `in` topic. The clientID in the payload is the only
+      // trustworthy source for that first hello; every later control message
+      // comes from a topic whose suffix already names the sender.
+      const effectiveFrom = control.type === "hello" ? control.clientID : from;
       this.dispatch({
         kind: "control",
-        from,
-        to,
+        from: effectiveFrom,
+        to: to ?? (control.type === "hello" ? this.hostID : undefined),
         control,
       });
     } catch (error) {
@@ -408,6 +435,19 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
         {
           topic: this.baseTopic,
           event: "turn",
+          payload: packet.bytes,
+        },
+      ];
+    }
+
+    if (packet.kind === "intent") {
+      if (packet.bytes === undefined) {
+        throw new Error("intent packet is missing bytes");
+      }
+      return [
+        {
+          topic: topicIn(this.baseTopic, packet.from),
+          event: "intent",
           payload: packet.bytes,
         },
       ];
@@ -527,7 +567,10 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
       handle.settled = true;
       handle.resolveReady();
       this.reconnectAttempts = 0;
-      this.emitState({ status: "connected" });
+      // reconnectNow() waits for every channel before emitting one connected
+      // state. Emitting here would wake RealtimeSession while its control
+      // channel is still detached, losing the history response to its hello.
+      if (!this.suppressConnected) this.emitState({ status: "connected" });
       return;
     }
 
@@ -584,6 +627,7 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
 
   private async reconnectNow(): Promise<void> {
     if (this.closed) return;
+    this.suppressConnected = true;
     await this.detachAll();
     try {
       await this.ensureGeneralChannel();
@@ -591,8 +635,10 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
         await this.ensureClientChannels(clientID);
       }
       this.reconnectAttempts = 0;
+      this.suppressConnected = false;
       this.emitState({ status: "connected" });
     } catch (error) {
+      this.suppressConnected = false;
       this.reportError(
         `reconnect failed: ${error instanceof Error ? error.message : String(error)}`,
       );

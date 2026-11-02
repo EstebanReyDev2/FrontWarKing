@@ -9,7 +9,13 @@ import type { RealtimeControl } from "@openfront/shared/RealtimeSchemas";
  * RealtimeWire; control messages stay as their JSON string form.
  */
 export type TransportPacket = {
-  kind: "turn" | "history_chunk" | "history_req" | "heartbeat" | "control";
+  kind:
+    | "turn"
+    | "intent"
+    | "history_chunk"
+    | "history_req"
+    | "heartbeat"
+    | "control";
   from: string;
   to?: string;
   bytes?: Uint8Array;
@@ -48,5 +54,6 @@ export interface RealtimeTransport {
   ): void | Promise<void>;
   broadcast(packet: Omit<TransportPacket, "to">): void | Promise<void>;
   close(): void | Promise<void>;
+  reconnect?(): void | Promise<void>;
   onStateChange?(listener: TransportStateListener): () => void;
 }

@@ -102,6 +102,64 @@ describe("SupabaseBroadcastTransport", () => {
     ]);
   });
 
+  it("routes intent batches from a peer's in topic to the host", async () => {
+    const bus = new FakeSupabaseBus();
+    const hostClient = new FakeSupabaseClient(bus, "host");
+    const peerClient = new FakeSupabaseClient(bus, "peer");
+    const host = makeTransport(hostClient, P1);
+    const peer = makeTransport(peerClient, P2);
+    const hostPackets: TransportPacket[] = [];
+    const hostListener = (packet: TransportPacket) => hostPackets.push(packet);
+    await host.subscribe(P1, hostListener);
+    await host.subscribe(P2, hostListener);
+    await peer.subscribe(P2, () => {});
+
+    const intent = bytes(1, 2, 3);
+    await peer.send({ kind: "intent", from: P2, bytes: intent }, [P1]);
+
+    expect(hostPackets).toHaveLength(1);
+    expect(hostPackets[0]).toMatchObject({
+      kind: "intent",
+      from: P2,
+      to: P1,
+    });
+    expect(hostPackets[0]?.bytes).toEqual(intent);
+    expect(bus.deliveries[0].topic).toBe(`game:game1:in:${P2}`);
+    expect(bus.deliveries[0].event).toBe("intent");
+  });
+
+  it("publishes the dev bootstrap hello on the general channel", async () => {
+    const bus = new FakeSupabaseBus();
+    const hostClient = new FakeSupabaseClient(bus, "host");
+    const peerClient = new FakeSupabaseClient(bus, "peer");
+    const host = makeTransport(hostClient, P1);
+    const peer = makeTransport(peerClient, P2);
+    const hostPackets: TransportPacket[] = [];
+    await host.subscribe(P1, (packet) => hostPackets.push(packet));
+    await peer.subscribe(P2, () => {});
+
+    const hello: RealtimeControl = {
+      type: "hello",
+      v: 1,
+      clientID: P2,
+      nickname: "Peer",
+      lastTurn: 0,
+      lastHash: 0,
+      coldStart: true,
+    };
+    await peer.broadcast({ kind: "control", from: P2, control: hello });
+
+    expect(bus.deliveries[0].topic).toBe("game:game1");
+    expect(bus.deliveries[0].event).toBe("hello");
+    expect(hostPackets).toHaveLength(1);
+    expect(hostPackets[0]).toMatchObject({
+      kind: "control",
+      from: P2,
+      to: P1,
+      control: hello,
+    });
+  });
+
   it("keeps binary frames binary and control frames JSON", async () => {
     const bus = new FakeSupabaseBus();
     const hostClient = new FakeSupabaseClient(bus, "host");
