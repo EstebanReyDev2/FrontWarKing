@@ -24,6 +24,16 @@ describe("realtime lobby preview", () => {
     document.body.append(element);
     await element.updateComplete;
 
+    const optionsGrid = element.querySelector(".grid");
+    expect(optionsGrid?.className).toContain("grid-cols-1");
+    expect(optionsGrid?.className).toContain("md:grid-cols-2");
+    expect(optionsGrid?.className).toContain("auto-rows-min");
+    expect(
+      [...(optionsGrid?.querySelectorAll("form") ?? [])].every((form) =>
+        form.classList.contains("min-w-0"),
+      ),
+    ).toBe(true);
+
     element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
     await element.updateComplete;
 

@@ -42,7 +42,7 @@ export class RealtimeLobbyPreview extends LitElement {
   render() {
     return html`
       <section
-        class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6 px-5 py-8 text-white sm:px-8"
+        class="mx-auto flex min-h-full w-full min-w-0 max-w-3xl flex-col gap-6 px-5 py-8 text-white sm:px-8"
       >
         <header class="flex flex-col gap-2">
           <button
@@ -88,9 +88,11 @@ export class RealtimeLobbyPreview extends LitElement {
           }}
         />
       </label>
-      <div class="grid gap-5 md:grid-cols-2">
+      <div
+        class="grid w-full min-w-0 grid-cols-1 auto-rows-min items-start gap-5 md:grid-cols-2"
+      >
         <form
-          class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl"
+          class="flex min-w-0 flex-col gap-4 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl"
           @submit=${(event: SubmitEvent) => {
             event.preventDefault();
             this.createRoom();
@@ -98,7 +100,7 @@ export class RealtimeLobbyPreview extends LitElement {
         >
           <h2 class="text-xl font-semibold">Crear una sala</h2>
           <button
-            class="mt-auto rounded-lg bg-malibu-blue px-4 py-3 font-bold text-white hover:bg-aquarius"
+            class="rounded-lg bg-malibu-blue px-4 py-3 font-bold text-white hover:bg-aquarius"
             type="submit"
           >
             Crear sala
@@ -107,7 +109,7 @@ export class RealtimeLobbyPreview extends LitElement {
         </form>
 
         <form
-          class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl"
+          class="flex min-w-0 flex-col gap-4 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl"
           @submit=${(event: SubmitEvent) => {
             event.preventDefault();
             this.joinRoom();
@@ -135,7 +137,7 @@ export class RealtimeLobbyPreview extends LitElement {
               </p>`
             : nothing}
           <button
-            class="mt-auto rounded-lg border border-white/15 bg-white/10 px-4 py-3 font-bold text-white hover:bg-white/15 disabled:cursor-wait disabled:opacity-60"
+            class="rounded-lg border border-white/15 bg-white/10 px-4 py-3 font-bold text-white hover:bg-white/15 disabled:cursor-wait disabled:opacity-60"
             type="submit"
             ?disabled=${this.joining}
           >
