@@ -210,6 +210,16 @@ export interface JoinLobbyEvent {
 }
 
 /**
+ * The preview and realtime-dev routes do not use the legacy game server list.
+ * Revisit this URL gate when the Node server is removed in F2d.
+ */
+export function startServerListPollingForRoute(search: string): void {
+  const params = new URLSearchParams(search);
+  if (params.has("lobby-preview") || params.has("realtime-dev")) return;
+  startServerListPolling();
+}
+
+/**
  * The single point where "a match is running" is published.
  *
  * Three consumers, and they must never disagree:
@@ -399,7 +409,7 @@ class Client {
     // can click Join or Create the list is already known and the click
     // never waits on a fetch (docs/MultiServer.md, "Server list v2"). It
     // never throws and keeps itself alive with a heartbeat afterwards.
-    startServerListPolling();
+    startServerListPollingForRoute(window.location.search);
 
     // Prefetch turnstile token so it is available when the user joins a lobby.
     // Desktop (Steam) has no Turnstile script and is server-side exempt, so

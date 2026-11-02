@@ -23,7 +23,13 @@ const mocks = vi.hoisted(() => ({
   getUserMe: vi.fn(async (): Promise<unknown> => false),
   invalidateUserMe: vi.fn(),
   joinLobby: vi.fn(),
+  startServerListPolling: vi.fn(),
 }));
+
+vi.mock("../../src/client/ServerList", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, startServerListPolling: mocks.startServerListPolling };
+});
 
 // Auth is imported by half the component tree; keep the real module and only
 // take over the four functions Main's auth flow calls.
@@ -249,6 +255,20 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
     expect(warnSpy).toHaveBeenCalledWith("Game version element not found");
   });
 
+  it("starts server-list polling on normal boot but skips preview and dev routes", async () => {
+    expect(mocks.startServerListPolling).toHaveBeenCalledTimes(1);
+    const { startServerListPollingForRoute } =
+      await import("../../src/client/Main");
+    mocks.startServerListPolling.mockClear();
+
+    startServerListPollingForRoute("?lobby-preview");
+    startServerListPollingForRoute("?realtime-dev");
+    expect(mocks.startServerListPolling).not.toHaveBeenCalled();
+
+    startServerListPollingForRoute("");
+    expect(mocks.startServerListPolling).toHaveBeenCalledTimes(1);
+  });
+
   it("clears the stale achievements.pushed record", () => {
     expect(localStorage.getItem("achievements.pushed")).toBeNull();
   });
@@ -256,10 +276,7 @@ describe("Client.initialize() booted from Main.ts module scope", () => {
   it("does not read or rewrite the removed store and purchase-nudge keys", () => {
     for (const key of ["storeSeenHash", "purchaseNudgeShown"]) {
       expect(storageGetSpy).not.toHaveBeenCalledWith(key);
-      expect(storageSetSpy).not.toHaveBeenCalledWith(
-        key,
-        expect.anything(),
-      );
+      expect(storageSetSpy).not.toHaveBeenCalledWith(key, expect.anything());
     }
   });
 
