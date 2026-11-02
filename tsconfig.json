@@ -17,6 +17,7 @@
     "src/scripts",
     "scripts/replay",
     "scripts/split-packages",
+    "scripts/realtime-smoke.ts",
     "vite.config.ts"
   ],
   "exclude": [

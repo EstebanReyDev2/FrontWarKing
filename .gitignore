@@ -8,6 +8,7 @@ TODO.txt
 resources/images/.DS_Store
 resources/.DS_Store
 .env*
+!.env.example
 .DS_Store
 .clinic/
 NOTES.md
