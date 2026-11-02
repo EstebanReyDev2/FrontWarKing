@@ -1,6 +1,6 @@
 # Fase 2 — Plan de Bloque 3
 
-**Estado:** propuesta para review; no implementada ni aprobada para ejecución.  
+**Estado:** aprobada para implementación con los ajustes del usuario; no implementada.  
 **Base:** F2a-5 (`9ca59f8bd`) y F2a-6 (`758fd68b6`) ya integran el transporte Supabase Broadcast, `RealtimeSession` y la fachada `Transport`.
 
 ## 1. Alcance propuesto
@@ -12,10 +12,13 @@ El §4.11 de `FASE-2-DISENO.md` llama a esto lobby mínimo de F2a: crear una sal
 ### Incluye
 
 - Crear sala efímera y compartir código/enlace de invitación.
-- Entrar con código, mostrar roster y apodos, manejar duplicados y sala llena.
+- Código de sala de 6 caracteres, generado con `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; al unirse, normalizar con uppercase + trim + quitar espacios.
+- Entrar con código, mostrar roster y apodos, manejar duplicados y sala llena. `MAX_PLAYERS = 7` (host + 6 compañeros); 8 es el techo absoluto, nunca 20.
+- Join con handshake: si el peer no recibe `hello` de vuelta del host en `JOIN_TIMEOUT_MS = 3000`, mostrar “Sala no encontrada o host desconectado”.
 - Mantener un único host fijo durante el lobby; sólo él puede empezar.
 - Al empezar, congelar un roster canónico, producir `gameStartInfo` y pasarlo a la sesión F2a existente.
 - Cerrar el lobby en los clientes si el host sale o desaparece antes de empezar; pedir que creen otra sala, no elegir un host nuevo.
+- No admitir peers nuevos después de empezar la partida; mostrar “Partida ya iniciada”. Rejoin mid-game de un peer ya conocido sigue siendo responsabilidad de `RealtimeSession`.
 - Documentar el modelo de identidad, los límites de abuso aceptados y los canales de Supabase usados.
 
 ### No incluye
@@ -61,7 +64,7 @@ El `persistentID` no debe reemplazar el índice del roster como prioridad futura
 
 Sin una autoridad server-side, cualquier límite implementado sólo en JavaScript es eludible por un cliente modificado. Para el lobby pequeño y privado se propone una defensa **best effort**, no un control anti-abuso:
 
-- Debounce de botones y cooldown local: sugerencia inicial de 1 creación cada 10 s y máximo 3 intentos de join en 30 s por pestaña.
+- Debounce de botones y cooldown local (si se implementa): sugerencia inicial de 1 creación cada 10 s y máximo 3 intentos de join en 30 s por pestaña. El comentario en código y este plan deben decir literalmente: “cooldown client-side, no protege contra abuso, protege contra doble-click accidental”. No hay rate limiting server-side.
 - Room code aleatorio de 6 caracteres, comparación en tiempo constante si se valida localmente, y errores uniformes para evitar filtrar si una sala existe.
 - Host limita roster a 20 jugadores y descarta mensajes repetidos por `persistentID`/secuencia.
 - Sin búsqueda/listado público de salas ni Presence usado como autoridad.
@@ -86,6 +89,7 @@ El setting actual de Supabase permite por defecto canales públicos; al deshabil
 - **F2c:** hardening, reenvío fiable de intents, refresh/catch-up del engine con optimización, manejo avanzado de particiones y topes extra.
 - **F2d:** despliegue estático Vercel y configuración de entorno de producción.
 - **Features de juego:** economía, recolección, edificios productores, eras/tecnologías, unidades, fortificaciones, civilizaciones y alianzas **siguen fuera de F2**. F2 sólo reemplaza red/sesión/lobby; el juego sigue siendo OpenFront con Supabase hasta que se implementen explícitamente F3–F7.
+- Un peer nuevo no puede entrar a una partida ya iniciada (late join desde mitad de partida fuera de B3); sólo se conserva el rejoin de un peer previamente conocido que ya soporta `RealtimeSession`.
 - Cuentas, perfiles durables, ranking, moderación, bans, salas públicas, persistencia de partidas y reaping de filas (si no hay tabla de rooms).
 
 ## 8. Riesgos abiertos
@@ -112,3 +116,10 @@ El setting actual de Supabase permite por defecto canales públicos; al deshabil
 4. ¿Mantenemos salas efímeras sin tabla ni proceso de reaping?
 
 **No ejecutar Bloque 3 hasta recibir aprobación explícita.**
+
+## 11. Aprobaciones y proceso de implementación
+
+- El usuario aprobó identidad `persistentID` en `localStorage` + código de sala + apodo, sin Supabase Auth, y canales públicos.
+- El usuario aprobó los ajustes: `MAX_PLAYERS = 7` (8 techo absoluto), código de 6 chars con charset no ambiguo, handshake de join con timeout de 3 s, cooldown sólo client-side con comentario explícito, y no admitir late join de peers nuevos.
+- B3-1 y B3-2 se implementan y commitean seguidos. Al terminar B3-2, frenar para que el usuario pruebe el lobby con datos fake; informar capturas/flujo y esperar OK antes de B3-3.
+- B3-3 y B3-4 pueden seguir en secuencia si no surge ambigüedad ni cambio de baseline. Al completar Bloque 3, esperar aprobación explícita antes de F2d.
