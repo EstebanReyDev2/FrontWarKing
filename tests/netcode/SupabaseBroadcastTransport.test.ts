@@ -160,7 +160,7 @@ describe("SupabaseBroadcastTransport", () => {
     });
   });
 
-  it("keeps binary frames binary and control frames JSON", async () => {
+  it("sends binary frames as ArrayBuffer and control frames as JSON", async () => {
     const bus = new FakeSupabaseBus();
     const hostClient = new FakeSupabaseClient(bus, "host");
     const peerClient = new FakeSupabaseClient(bus, "peer");
@@ -180,8 +180,10 @@ describe("SupabaseBroadcastTransport", () => {
       term: 2,
     });
 
-    expect(bus.deliveries[0].payload).toBe(turn);
-    expect(bus.deliveries[0].payload).toBeInstanceOf(Uint8Array);
+    expect(bus.deliveries[0].payload).toBeInstanceOf(ArrayBuffer);
+    expect(
+      Array.from(new Uint8Array(bus.deliveries[0].payload as ArrayBuffer)),
+    ).toEqual([0xaa, 0xbb]);
     expect(typeof bus.deliveries[1].payload).toBe("string");
     expect(received).toHaveLength(2);
     expect(received[1]).toMatchObject({

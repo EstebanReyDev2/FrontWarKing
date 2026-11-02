@@ -83,7 +83,7 @@ export class FakeChannel implements SupabaseChannelLike {
   private readonly handlers = new Map<string, Set<BroadcastHandler>>();
   readonly sent: Array<{
     event: string;
-    payload: Uint8Array | string;
+    payload: Uint8Array | ArrayBuffer | string;
   }> = [];
 
   constructor(
@@ -120,7 +120,7 @@ export class FakeChannel implements SupabaseChannelLike {
   send(args: {
     type: "broadcast";
     event: string;
-    payload: Uint8Array | string;
+    payload: Uint8Array | ArrayBuffer | string;
   }): Promise<unknown> {
     this.sent.push({ event: args.event, payload: args.payload });
     this.bus.deliver(this.topic, args.event, args.payload, this);

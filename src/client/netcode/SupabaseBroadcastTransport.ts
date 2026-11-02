@@ -35,7 +35,7 @@ export type SupabaseChannelLike = {
   send(args: {
     type: "broadcast";
     event: string;
-    payload: Uint8Array | string;
+    payload: Uint8Array | ArrayBuffer | string;
   }): Promise<unknown>;
   unsubscribe(): Promise<unknown>;
 };
@@ -44,6 +44,13 @@ export type SupabaseClientLike = {
   channel(name: string, options?: unknown): SupabaseChannelLike;
   removeChannel?(channel: SupabaseChannelLike): Promise<unknown>;
 };
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+}
 
 export type SupabaseBroadcastTransportOptions = {
   client: SupabaseClientLike;
@@ -543,14 +550,16 @@ export class SupabaseBroadcastTransport implements RealtimeTransport {
   private async publish(
     topic: string,
     event: string,
-    payload: Uint8Array | string,
+    payload: Uint8Array | ArrayBuffer | string,
   ): Promise<void> {
     if (this.closed) return;
     const handle = await this.ensureChannel(topic);
+    const wirePayload =
+      payload instanceof Uint8Array ? toArrayBuffer(payload) : payload;
     const result = await handle.channel.send({
       type: "broadcast",
       event,
-      payload,
+      payload: wirePayload,
     });
     if (result === "error" || result === "timed out") {
       this.reportError(`broadcast ${event} on ${topic} returned ${result}`);
