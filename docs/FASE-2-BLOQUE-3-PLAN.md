@@ -12,7 +12,7 @@ El §4.11 de `FASE-2-DISENO.md` llama a esto lobby mínimo de F2a: crear una sal
 ### Incluye
 
 - Crear sala efímera y compartir código/enlace de invitación.
-- Código de sala de 6 caracteres, generado con `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; al unirse, normalizar con uppercase + trim + quitar espacios.
+- Código de sala de 6 caracteres, generado con `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (31 caracteres: excluye `I`, `L`, `O`, `0`, `1`; conserva `S`, `5`, `B`, `8`); al unirse, normalizar con uppercase + trim + quitar espacios internos.
 - Entrar con código, mostrar roster y apodos, manejar duplicados y sala llena. `MAX_PLAYERS = 7` (host + 6 compañeros); 8 es el techo absoluto, nunca 20.
 - Join con handshake: si el peer no recibe `hello` de vuelta del host en `JOIN_TIMEOUT_MS = 3000`, mostrar “Sala no encontrada o host desconectado”.
 - Mantener un único host fijo durante el lobby; sólo él puede empezar.

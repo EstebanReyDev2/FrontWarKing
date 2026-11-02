@@ -68,6 +68,7 @@ import { initNavigation } from "./Navigation";
 import { capturePagePin } from "./PagePin";
 import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
 import { mountRealtimeDev } from "./RealtimeDev";
+import "./lobby/RealtimeLobbyPreview";
 import {
   ensureServerList,
   redirectToGameVersion,
@@ -1574,6 +1575,9 @@ const bootstrap = () => {
   initLayout();
   new Client().initialize();
   initNavigation();
+  if (new URLSearchParams(window.location.search).has("lobby-preview")) {
+    window.showPage?.("page-realtime-lobby-preview");
+  }
   prefetchGameClient();
   prefetchModals();
 
