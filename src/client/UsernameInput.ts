@@ -20,6 +20,7 @@ import {
   type ClaimGrace,
   type ResolvedPlayerName,
 } from "./PlayerName";
+import { isPreviewRoute } from "./RouteMode";
 import { steamSDK } from "./SteamSDK";
 import {
   MAX_USERNAME_LENGTH,
@@ -377,6 +378,7 @@ export class UsernameInput extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (isPreviewRoute()) return;
     // Refresh unconditionally, before the fetch below can short-circuit.
     // disconnectedCallback clears the timer but leaves userMe set, so a
     // detach/reattach of the same instance takes the `userMe !== null` early

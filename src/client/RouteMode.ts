@@ -5,3 +5,19 @@ export function isPreviewRoute(search = window.location.search): boolean {
 export function isRealtimeDevRoute(search = window.location.search): boolean {
   return new URLSearchParams(search).has("realtime-dev");
 }
+
+export function shouldStartLegacyLobbyFeed(
+  search = window.location.search,
+): boolean {
+  return !isPreviewRoute(search) && !isRealtimeDevRoute(search);
+}
+
+export function shouldLoadInitialAuth(
+  search = window.location.search,
+): boolean {
+  return !isPreviewRoute(search);
+}
+
+export function shouldLoadTurnstile(search = window.location.search): boolean {
+  return !isPreviewRoute(search) && !isRealtimeDevRoute(search);
+}

@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en" class="h-full preload" translate="no">
   <head>
+    <script>
+      const routeParams = new URLSearchParams(location.search);
+      if (routeParams.has("lobby-preview")) {
+        document.documentElement.classList.add("is-preview-mode");
+      }
+      if (routeParams.has("realtime-dev")) {
+        document.documentElement.classList.add("is-realtime-dev-mode");
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -153,16 +162,47 @@
     ></script>
 
     <!-- Cloudflare Turnstile -->
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-    ></script>
+    <script>
+      if (
+        !routeParams.has("lobby-preview") &&
+        !routeParams.has("realtime-dev")
+      ) {
+        const turnstileScript = document.createElement("script");
+        turnstileScript.src =
+          "https://challenges.cloudflare.com/turnstile/v0/api.js";
+        turnstileScript.async = true;
+        turnstileScript.defer = true;
+        document.head.append(turnstileScript);
+      }
+    </script>
   </head>
 
   <body
     class="select-none font-sans min-h-screen bg-neutral-800 transition-opacity duration-300 ease-in-out flex flex-row flex-wrap content-start"
   >
+    <style>
+      html.is-preview-mode desktop-nav-bar,
+      html.is-preview-mode mobile-nav-bar,
+      html.is-preview-mode #mobile-menu-backdrop,
+      html.is-preview-mode play-page,
+      html.is-preview-mode #turnstile-container,
+      html.is-realtime-dev-mode desktop-nav-bar,
+      html.is-realtime-dev-mode mobile-nav-bar,
+      html.is-realtime-dev-mode #mobile-menu-backdrop,
+      html.is-realtime-dev-mode play-page,
+      html.is-realtime-dev-mode #turnstile-container {
+        display: none !important;
+      }
+
+      html.is-preview-mode #page-realtime-lobby-preview,
+      html.is-realtime-dev-mode #page-realtime-lobby-preview {
+        display: block !important;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        overflow-y: auto;
+      }
+    </style>
     <script>
       // Halloween theme (src/client/halloween.css), Oct 25 through Nov 1 local
       // time. It recolors the desktop logo, which is otherwise left unset.

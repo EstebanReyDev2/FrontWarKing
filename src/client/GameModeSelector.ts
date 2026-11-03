@@ -29,6 +29,7 @@ import type { JoinLobbyModal } from "./JoinLobbyModal";
 import { whenModalLoaded } from "./LazyModals";
 import { PublicLobbySocket } from "./LobbySocket";
 import { JoinLobbyEvent } from "./Main";
+import { shouldStartLegacyLobbyFeed } from "./RouteMode";
 import {
   backendUnreachableConfirmed,
   isPinnedToAVersion,
@@ -554,6 +555,11 @@ export class GameModeSelector extends LitElement {
   }
 
   private openLobbyFeed(refreshList = false) {
+    if (!shouldStartLegacyLobbyFeed()) {
+      this.feedWanted = false;
+      this.lobbies = null;
+      return;
+    }
     this.feedWanted = true;
     this.feedGaveUp = false;
     if (lobbyFeedSuspended(this.desktopSessionState)) {

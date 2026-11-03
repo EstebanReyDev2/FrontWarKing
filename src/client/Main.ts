@@ -70,6 +70,11 @@ import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
 import { mountRealtimeDev } from "./RealtimeDev";
 import "./lobby/RealtimeLobbyPreview";
 import {
+  isPreviewRoute,
+  shouldLoadInitialAuth,
+  shouldLoadTurnstile,
+} from "./RouteMode";
+import {
   ensureServerList,
   redirectToGameVersion,
   setServerListInGame,
@@ -419,7 +424,9 @@ class Client {
     // so rendering the widget there just fails — and replays never
     // send a token anyway (see getTurnstileToken below).
     const turnstilePrefetch =
-      isDesktopShell() || isReplayShellHost(window.location.hostname)
+      !shouldLoadTurnstile() ||
+      isDesktopShell() ||
+      isReplayShellHost(window.location.hostname)
         ? null
         : getTurnstileToken();
     // A prefetch that fails is not an error anyone has asked about yet: the
@@ -671,13 +678,15 @@ class Client {
       applyUserMe(generation)(result === false ? false : await getUserMe());
     });
 
-    const initialAuthGeneration = authGeneration;
-    if ((await userAuth()) === false) {
-      // Not logged in: apply the signed-out profile directly.
-      applyUserMe(initialAuthGeneration)(false);
-    } else {
-      // JWT appears valid: fetch the profile and apply it if still current.
-      getUserMe().then(applyUserMe(initialAuthGeneration));
+    if (shouldLoadInitialAuth()) {
+      const initialAuthGeneration = authGeneration;
+      if ((await userAuth()) === false) {
+        // Not logged in: apply the signed-out profile directly.
+        applyUserMe(initialAuthGeneration)(false);
+      } else {
+        // JWT appears valid: fetch the profile and apply it if still current.
+        getUserMe().then(applyUserMe(initialAuthGeneration));
+      }
     }
 
     // Re-run auth when the player signs into their portal account mid-session.
@@ -1585,7 +1594,7 @@ const bootstrap = () => {
   initLayout();
   new Client().initialize();
   initNavigation();
-  if (new URLSearchParams(window.location.search).has("lobby-preview")) {
+  if (isPreviewRoute()) {
     window.showPage?.("page-realtime-lobby-preview");
   }
   prefetchGameClient();
