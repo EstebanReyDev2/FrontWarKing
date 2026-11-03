@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveGuestNickname } from "../../src/client/lobby/GuestIdentity";
 import { JOIN_TIMEOUT_MS } from "../../src/client/lobby/LobbyRules";
 import { RealtimeLobbyPreview } from "../../src/client/lobby/RealtimeLobbyPreview";
 
 describe("realtime lobby preview", () => {
   let element: RealtimeLobbyPreview;
+
+  beforeEach(() => {
+    history.replaceState({}, "", "/?lobby-preview");
+  });
 
   afterEach(() => {
     element?.remove();
@@ -44,6 +48,9 @@ describe("realtime lobby preview", () => {
     expect(element.textContent).toContain("1/7");
     expect(element.querySelector("button[disabled]")?.textContent).toContain(
       "Empezar",
+    );
+    expect(element.querySelector('[role="status"]')?.textContent).toContain(
+      "Necesitás al menos 2 jugadores para empezar",
     );
     expect(element.querySelector("select")?.options).toHaveLength(15);
   });
@@ -96,14 +103,15 @@ describe("realtime lobby preview", () => {
     expect(startButton?.disabled).toBe(true);
     expect(window.__debugGameStartInfo).toBeUndefined();
 
-    Object.assign(element, {
-      players: [
-        { persistentID: "host1234", nickname: "Office host", host: true },
-        { persistentID: "peer1234", nickname: "Office peer" },
-      ],
-    });
+    [...element.querySelectorAll("button")]
+      .find((button) =>
+        button.textContent?.includes("Agregar jugador de prueba"),
+      )
+      ?.click();
     await element.updateComplete;
+    expect(element.textContent).toContain("2/7");
     expect(startButton?.disabled).toBe(false);
+    expect(element.querySelector('[role="status"]')).toBeNull();
 
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     const documentDispatchSpy = vi.spyOn(document, "dispatchEvent");
@@ -120,6 +128,10 @@ describe("realtime lobby preview", () => {
       randomSpawn: false,
     });
     expect(window.__debugGameStartInfo?.players).toHaveLength(2);
+    expect(window.__debugGameStartInfo?.players[1]).toMatchObject({
+      clientID: "test-peer-2",
+      username: "Jugador de prueba 2",
+    });
     expect(element.textContent).toContain(
       "Config lista: Africa — esperando B3-3b",
     );
@@ -132,6 +144,61 @@ describe("realtime lobby preview", () => {
     dispatchSpy.mockRestore();
     documentDispatchSpy.mockRestore();
   });
+
+  it("adds fake peers to the player limit and removes them again", async () => {
+    saveGuestNickname("Office host");
+    element = document.createElement(
+      "realtime-lobby-preview",
+    ) as RealtimeLobbyPreview;
+    document.body.append(element);
+    await element.updateComplete;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await element.updateComplete;
+
+    const addButton = [...element.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Agregar jugador de prueba"),
+    );
+    for (let index = 0; index < 6; index++) {
+      addButton?.click();
+      await element.updateComplete;
+    }
+    expect(element.textContent).toContain("7/7");
+    expect(addButton?.disabled).toBe(true);
+    expect(element.textContent).toContain("Límite de 7 jugadores alcanzado");
+
+    for (let index = 0; index < 6; index++) {
+      const removeButton = element.querySelector<HTMLButtonElement>(
+        'button[aria-label^="Quitar"]',
+      );
+      removeButton?.click();
+      await element.updateComplete;
+    }
+    expect(element.textContent).toContain("1/7");
+    expect(
+      [...element.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Empezar",
+      )?.disabled,
+    ).toBe(true);
+  });
+
+  it.each(["/", "/?realtime-dev&room=ABC234"])(
+    "does not show the test-peer control on %s",
+    async (url) => {
+      history.replaceState({}, "", url);
+      saveGuestNickname("Office host");
+      element = document.createElement(
+        "realtime-lobby-preview",
+      ) as RealtimeLobbyPreview;
+      document.body.append(element);
+      await element.updateComplete;
+      element
+        .querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.click();
+      await element.updateComplete;
+
+      expect(element.textContent).not.toContain("Agregar jugador de prueba");
+    },
+  );
 
   it("simulates joining from an invite link with fake host data", async () => {
     history.replaceState({}, "", "/?lobby-preview&room=ABC234");

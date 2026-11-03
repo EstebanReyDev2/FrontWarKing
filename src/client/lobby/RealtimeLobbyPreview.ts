@@ -3,6 +3,7 @@ import type { WireGameStartInfo } from "@openfront/shared/WireSchemas";
 import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { allLobbyMaps, curatedMaps } from "../CuratedMaps";
+import { isPreviewRoute } from "../RouteMode";
 import { getGuestIdentity, saveGuestNickname } from "./GuestIdentity";
 import {
   createRoomCode,
@@ -17,7 +18,7 @@ import {
   type PreviewRosterPlayer,
 } from "./PreviewGameConfig";
 
-type LobbyPlayer = PreviewRosterPlayer & { host?: boolean };
+type LobbyPlayer = PreviewRosterPlayer & { host?: boolean; testPeer?: boolean };
 
 declare global {
   interface Window {
@@ -175,6 +176,9 @@ export class RealtimeLobbyPreview extends LitElement {
     inviteURL.searchParams.set("lobby-preview", "");
     inviteURL.searchParams.set("room", this.roomCode);
     const canStart = canStartPreviewGame(this.isHost, this.players.length);
+    const showTestPeerControls = this.isHost && isPreviewRoute();
+    const canAddTestPeer =
+      showTestPeerControls && this.players.length < MAX_PLAYERS;
     const visibleMaps = this.showAllMaps
       ? allLobbyMaps
       : curatedMaps.map(({ map }) => map);
@@ -218,9 +222,37 @@ export class RealtimeLobbyPreview extends LitElement {
                       >HOST</span
                     >`
                   : nothing}
+                ${showTestPeerControls && player.testPeer
+                  ? html`<button
+                      class="ml-auto rounded border border-white/15 px-2 py-1 text-xs text-white/70 hover:bg-white/10"
+                      aria-label="Quitar ${player.nickname}"
+                      @click=${() => this.removeTestPeer(player.persistentID)}
+                    >
+                      Quitar
+                    </button>`
+                  : nothing}
               </li>`,
             )}
           </ul>
+          ${showTestPeerControls
+            ? html`<div class="flex flex-wrap items-center gap-2">
+                <button
+                  class="self-start rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  ?disabled=${!canAddTestPeer}
+                  title=${canAddTestPeer
+                    ? "Agrega un jugador local de prueba; no conecta a realtime."
+                    : `Límite de ${MAX_PLAYERS} jugadores alcanzado.`}
+                  @click=${() => this.addTestPeer()}
+                >
+                  Agregar jugador de prueba
+                </button>
+                ${this.players.length >= MAX_PLAYERS
+                  ? html`<span class="text-xs text-white/50"
+                      >Límite de ${MAX_PLAYERS} jugadores alcanzado.</span
+                    >`
+                  : nothing}
+              </div>`
+            : nothing}
         </div>
         <section
           class="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/15 p-4"
@@ -298,6 +330,11 @@ export class RealtimeLobbyPreview extends LitElement {
               </button>`
             : nothing}
         </div>
+        ${this.isHost && !canStart
+          ? html`<p class="text-sm text-amber-100/80" role="status">
+              Necesitás al menos 2 jugadores para empezar.
+            </p>`
+          : nothing}
       </section>
     `;
   }
@@ -396,6 +433,34 @@ export class RealtimeLobbyPreview extends LitElement {
       this.players,
     );
     window.__debugGameStartInfo = this.gameStartInfo;
+  }
+
+  private addTestPeer(): void {
+    if (!this.isHost || !isPreviewRoute() || this.players.length >= MAX_PLAYERS)
+      return;
+    const lastTestPeerNumber = this.players.reduce((highest, player) => {
+      const match = /^test-peer-(\d+)$/.exec(player.persistentID);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 1);
+    const nextNumber = lastTestPeerNumber + 1;
+    this.players = [
+      ...this.players,
+      {
+        persistentID: `test-peer-${nextNumber}`,
+        nickname: `Jugador de prueba ${nextNumber}`,
+        testPeer: true,
+      },
+    ];
+    this.gameStartInfo = null;
+    delete window.__debugGameStartInfo;
+  }
+
+  private removeTestPeer(persistentID: string): void {
+    this.players = this.players.filter(
+      (player) => player.persistentID !== persistentID || !player.testPeer,
+    );
+    this.gameStartInfo = null;
+    delete window.__debugGameStartInfo;
   }
 
   private clearJoinTimer(): void {
