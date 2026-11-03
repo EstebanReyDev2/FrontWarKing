@@ -1,5 +1,8 @@
+import { GameMapType } from "@openfront/engine-api/game/Maps.gen";
+import type { WireGameStartInfo } from "@openfront/shared/WireSchemas";
 import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { allLobbyMaps, curatedMaps } from "../CuratedMaps";
 import { getGuestIdentity, saveGuestNickname } from "./GuestIdentity";
 import {
   createRoomCode,
@@ -8,8 +11,19 @@ import {
   MAX_PLAYERS,
   normalizeRoomCode,
 } from "./LobbyRules";
+import {
+  canStartPreviewGame,
+  createPreviewGameStartInfo,
+  type PreviewRosterPlayer,
+} from "./PreviewGameConfig";
 
-type LobbyPlayer = { persistentID: string; nickname: string; host?: boolean };
+type LobbyPlayer = PreviewRosterPlayer & { host?: boolean };
+
+declare global {
+  interface Window {
+    __debugGameStartInfo?: WireGameStartInfo;
+  }
+}
 
 /** UI-only lobby preview. It deliberately does not create a realtime session. */
 @customElement("realtime-lobby-preview")
@@ -25,6 +39,9 @@ export class RealtimeLobbyPreview extends LitElement {
   @state() private joining = false;
   @state() private players: LobbyPlayer[] = [];
   @state() private isHost = false;
+  @state() private selectedMap = curatedMaps[0].map;
+  @state() private showAllMaps = false;
+  @state() private gameStartInfo: WireGameStartInfo | null = null;
   private joinTimer?: number;
 
   connectedCallback(): void {
@@ -157,6 +174,11 @@ export class RealtimeLobbyPreview extends LitElement {
     const inviteURL = new URL(window.location.href);
     inviteURL.searchParams.set("lobby-preview", "");
     inviteURL.searchParams.set("room", this.roomCode);
+    const canStart = canStartPreviewGame(this.isHost, this.players.length);
+    const visibleMaps = this.showAllMaps
+      ? allLobbyMaps
+      : curatedMaps.map(({ map }) => map);
+    const selectedMapLabel = this.selectedMap;
     return html`
       <section
         class="flex flex-col gap-5 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl sm:p-7"
@@ -200,12 +222,61 @@ export class RealtimeLobbyPreview extends LitElement {
             )}
           </ul>
         </div>
+        <section
+          class="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/15 p-4"
+          aria-label="Configuración de partida"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <label
+              class="flex min-w-0 flex-1 flex-col gap-2 text-sm text-white/75"
+            >
+              Mapa
+              <select
+                class="rounded-lg border border-white/15 bg-neutral-900 px-3 py-2 text-base text-white"
+                .value=${this.selectedMap}
+                @change=${(event: Event) => {
+                  this.selectedMap = (event.target as HTMLSelectElement)
+                    .value as GameMapType;
+                  this.gameStartInfo = null;
+                  delete window.__debugGameStartInfo;
+                }}
+              >
+                ${visibleMaps.map(
+                  (map) =>
+                    html`<option
+                      value=${map}
+                      ?selected=${map === this.selectedMap}
+                    >
+                      ${map}
+                    </option>`,
+                )}
+              </select>
+            </label>
+            <button
+              class="self-end rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
+              aria-pressed=${this.showAllMaps}
+              @click=${() => this.toggleAllMaps()}
+            >
+              ${this.showAllMaps
+                ? "Ver mapas recomendados"
+                : "Ver todos los mapas"}
+            </button>
+          </div>
+          ${!this.showAllMaps
+            ? html`<p class="text-xs text-white/50">
+                ${curatedMaps.find(({ map }) => map === this.selectedMap)
+                  ?.reason ?? "Mapa recomendado para partidas de oficina."}
+              </p>`
+            : nothing}
+        </section>
         <p
           class="rounded-lg border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"
         >
-          ${this.isHost
-            ? "Compartí el enlace o el código con tus compañeros."
-            : "Conectado a una sala de demostración; la conexión real llega en B3-3."}
+          ${this.gameStartInfo
+            ? `Config lista: ${selectedMapLabel} — esperando B3-3b.`
+            : this.isHost
+              ? "Compartí el enlace o el código con tus compañeros."
+              : "Conectado a una sala de demostración; la conexión real llega en B3-3."}
         </p>
         <div class="flex flex-wrap justify-between gap-3">
           <button
@@ -214,13 +285,18 @@ export class RealtimeLobbyPreview extends LitElement {
           >
             Volver
           </button>
-          <button
-            class="rounded-lg bg-malibu-blue/40 px-4 py-2 text-sm font-bold text-white/60"
-            disabled
-            title="El arranque se implementa en B3-3"
-          >
-            Empezar (B3-3)
-          </button>
+          ${this.isHost
+            ? html`<button
+                class="rounded-lg bg-malibu-blue px-4 py-2 text-sm font-bold text-white hover:bg-aquarius disabled:cursor-not-allowed disabled:opacity-50"
+                ?disabled=${!canStart}
+                title=${canStart
+                  ? "Preparar configuración (no inicia la partida)"
+                  : "Se necesitan al menos 2 jugadores."}
+                @click=${() => this.prepareStart()}
+              >
+                Empezar
+              </button>`
+            : nothing}
         </div>
       </section>
     `;
@@ -242,6 +318,8 @@ export class RealtimeLobbyPreview extends LitElement {
       },
     ];
     this.error = "";
+    this.gameStartInfo = null;
+    delete window.__debugGameStartInfo;
   }
 
   private joinRoom(): void {
@@ -295,6 +373,29 @@ export class RealtimeLobbyPreview extends LitElement {
     this.players = [];
     this.isHost = false;
     this.error = "";
+    this.gameStartInfo = null;
+    delete window.__debugGameStartInfo;
+  }
+
+  private toggleAllMaps(): void {
+    this.showAllMaps = !this.showAllMaps;
+    if (
+      !this.showAllMaps &&
+      !curatedMaps.some(({ map }) => map === this.selectedMap)
+    ) {
+      this.selectedMap = curatedMaps[0].map;
+    }
+    this.gameStartInfo = null;
+    delete window.__debugGameStartInfo;
+  }
+
+  private prepareStart(): void {
+    if (!canStartPreviewGame(this.isHost, this.players.length)) return;
+    this.gameStartInfo = createPreviewGameStartInfo(
+      this.selectedMap,
+      this.players,
+    );
+    window.__debugGameStartInfo = this.gameStartInfo;
   }
 
   private clearJoinTimer(): void {
