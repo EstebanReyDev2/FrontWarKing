@@ -8,10 +8,10 @@ import { getGuestIdentity, saveGuestNickname } from "./GuestIdentity";
 import {
   createRoomCode,
   isValidRoomCode,
-  JOIN_TIMEOUT_MS,
   MAX_PLAYERS,
   normalizeRoomCode,
 } from "./LobbyRules";
+import { LobbyRoomCollisionError, LobbySession } from "./LobbySession";
 import {
   canStartPreviewGame,
   createPreviewGameStartInfo,
@@ -26,7 +26,7 @@ declare global {
   }
 }
 
-/** UI-only lobby preview. It deliberately does not create a realtime session. */
+/** Pre-game lobby preview; starting a game remains deliberately disabled. */
 @customElement("realtime-lobby-preview")
 export class RealtimeLobbyPreview extends LitElement {
   createRenderRoot() {
@@ -43,18 +43,21 @@ export class RealtimeLobbyPreview extends LitElement {
   @state() private selectedMap = curatedMaps[0].map;
   @state() private showAllMaps = false;
   @state() private gameStartInfo: WireGameStartInfo | null = null;
-  private joinTimer?: number;
+  private lobbySession?: LobbySession;
 
   connectedCallback(): void {
     super.connectedCallback();
     this.nickname = getGuestIdentity().nickname;
     const inviteCode = new URLSearchParams(location.search).get("room");
-    if (inviteCode !== null) this.joinCode = normalizeRoomCode(inviteCode);
+    if (inviteCode !== null) {
+      this.joinCode = normalizeRoomCode(inviteCode);
+      if (this.nickname) queueMicrotask(() => void this.joinRoom());
+    }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.clearJoinTimer();
+    void this.leaveRoom();
   }
 
   render() {
@@ -76,8 +79,7 @@ export class RealtimeLobbyPreview extends LitElement {
             ${this.roomCode ? "Sala de juego" : "Jugar con compañeros"}
           </h1>
           <p class="max-w-2xl text-sm text-white/65">
-            Vista previa con datos ficticios. Todavía no se conecta a Supabase
-            ni inicia una partida.
+            Lobby realtime efímero. La partida todavía no se inicia.
           </p>
         </header>
 
@@ -120,6 +122,7 @@ export class RealtimeLobbyPreview extends LitElement {
           <button
             class="rounded-lg bg-malibu-blue px-4 py-3 font-bold text-white hover:bg-aquarius"
             type="submit"
+            ?disabled=${this.joining}
           >
             Crear sala
           </button>
@@ -308,7 +311,7 @@ export class RealtimeLobbyPreview extends LitElement {
             ? `Config lista: ${selectedMapLabel} — esperando B3-3b.`
             : this.isHost
               ? "Compartí el enlace o el código con tus compañeros."
-              : "Conectado a una sala de demostración; la conexión real llega en B3-3."}
+              : "Conectado a la sala. El inicio realtime llega en el siguiente sub-bloque."}
         </p>
         <div class="flex flex-wrap justify-between gap-3">
           <button
@@ -339,27 +342,52 @@ export class RealtimeLobbyPreview extends LitElement {
     `;
   }
 
-  private createRoom(): void {
+  private async createRoom(): Promise<void> {
+    if (this.joining) return;
     this.nickname = saveGuestNickname(this.nickname);
     if (!this.nickname) {
       this.error = "Ingresá un apodo válido.";
       return;
     }
-    this.roomCode = createRoomCode();
-    this.isHost = true;
-    this.players = [
-      {
-        persistentID: getGuestIdentity().persistentID,
-        nickname: this.nickname,
-        host: true,
-      },
-    ];
     this.error = "";
     this.gameStartInfo = null;
     delete window.__debugGameStartInfo;
+    this.joining = true;
+    try {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const code = createRoomCode();
+        try {
+          this.lobbySession = await LobbySession.createHost({
+            roomCode: code,
+            clientID: getGuestIdentity().persistentID,
+            nickname: this.nickname,
+            onRoster: (players) => {
+              this.players = this.mergeTestPeers(players);
+            },
+            onError: (error) => (this.error = error.message),
+          });
+          if (!this.isConnected) {
+            await this.lobbySession.close();
+            this.lobbySession = undefined;
+            return;
+          }
+          this.roomCode = code;
+          this.isHost = true;
+          this.joining = false;
+          return;
+        } catch (error) {
+          if (!(error instanceof LobbyRoomCollisionError)) throw error;
+        }
+      }
+      throw new Error("No se pudo reservar un código de sala. Probá de nuevo.");
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : String(error);
+      this.joining = false;
+    }
   }
 
-  private joinRoom(): void {
+  private async joinRoom(): Promise<void> {
+    if (this.joining) return;
     const code = normalizeRoomCode(this.joinCode);
     this.joinCode = code;
     this.error = "";
@@ -374,38 +402,40 @@ export class RealtimeLobbyPreview extends LitElement {
 
     this.nickname = saveGuestNickname(this.nickname);
     this.joining = true;
-    this.clearJoinTimer();
-
-    // The preview route simulates the host reply. B3-3 replaces this with the
-    // actual `hello` handshake and its production timeout.
-    const inviteCode = new URLSearchParams(location.search).get("room");
-    if (inviteCode !== null && normalizeRoomCode(inviteCode) === code) {
-      this.joinTimer = window.setTimeout(() => this.acceptDemoJoin(code), 150);
-      return;
-    }
-
-    this.joinTimer = window.setTimeout(() => {
-      this.joining = false;
-      this.error = "Sala no encontrada o host desconectado";
-    }, JOIN_TIMEOUT_MS);
-  }
-
-  private acceptDemoJoin(code: string): void {
-    this.joining = false;
-    this.roomCode = code;
-    this.isHost = false;
-    this.players = [
-      { persistentID: "demo-host", nickname: "Host de prueba", host: true },
-      {
-        persistentID: getGuestIdentity().persistentID,
+    try {
+      const session = await LobbySession.joinPeer({
+        roomCode: code,
+        clientID: getGuestIdentity().persistentID,
         nickname: this.nickname,
-      },
-    ];
-    this.error = "";
+        onRoster: (players) => (this.players = players),
+        onHostLost: () => {
+          void (async () => {
+            await this.leaveRoom();
+            this.error =
+              "El host se desconectó. La sala ya no está disponible.";
+          })();
+        },
+        onError: (error) => (this.error = error.message),
+      });
+      if (!this.isConnected) {
+        await session.close();
+        return;
+      }
+      this.lobbySession = session;
+      this.roomCode = code;
+      this.isHost = false;
+      this.joining = false;
+      this.error = "";
+    } catch (error) {
+      this.joining = false;
+      this.error = error instanceof Error ? error.message : String(error);
+    }
   }
 
-  private leaveRoom(): void {
-    this.clearJoinTimer();
+  private async leaveRoom(): Promise<void> {
+    const session = this.lobbySession;
+    this.lobbySession = undefined;
+    await session?.close();
     this.roomCode = "";
     this.players = [];
     this.isHost = false;
@@ -463,10 +493,9 @@ export class RealtimeLobbyPreview extends LitElement {
     delete window.__debugGameStartInfo;
   }
 
-  private clearJoinTimer(): void {
-    if (this.joinTimer !== undefined) {
-      window.clearTimeout(this.joinTimer);
-      this.joinTimer = undefined;
-    }
+  private mergeTestPeers(players: LobbyPlayer[]): LobbyPlayer[] {
+    const realPlayers = players.slice(0, MAX_PLAYERS);
+    const testPeers = this.players.filter((player) => player.testPeer);
+    return [...realPlayers, ...testPeers].slice(0, MAX_PLAYERS);
   }
 }

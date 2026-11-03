@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveGuestNickname } from "../../src/client/lobby/GuestIdentity";
-import { JOIN_TIMEOUT_MS } from "../../src/client/lobby/LobbyRules";
+import { LobbySession } from "../../src/client/lobby/LobbySession";
 import { RealtimeLobbyPreview } from "../../src/client/lobby/RealtimeLobbyPreview";
 
 describe("realtime lobby preview", () => {
@@ -8,6 +8,19 @@ describe("realtime lobby preview", () => {
 
   beforeEach(() => {
     history.replaceState({}, "", "/?lobby-preview");
+    vi.spyOn(LobbySession, "createHost").mockImplementation(async (options) => {
+      options.onRoster([
+        {
+          persistentID: options.clientID,
+          nickname: options.nickname,
+          host: true,
+        },
+      ]);
+      return { close: vi.fn() } as unknown as LobbySession;
+    });
+    vi.spyOn(LobbySession, "joinPeer").mockRejectedValue(
+      new Error("Sala no encontrada o host desconectado"),
+    );
   });
 
   afterEach(() => {
@@ -16,6 +29,7 @@ describe("realtime lobby preview", () => {
     history.replaceState({}, "", "/");
     delete window.__debugGameStartInfo;
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("creates a room with the guest and displays its share code", async () => {
@@ -41,6 +55,8 @@ describe("realtime lobby preview", () => {
 
     element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
     await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
 
     expect(element.textContent).toContain("Código de sala");
     expect(element.textContent).toContain("Office host");
@@ -63,6 +79,8 @@ describe("realtime lobby preview", () => {
     document.body.append(element);
     await element.updateComplete;
     element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await element.updateComplete;
 
     const mapSelect = element.querySelector<HTMLSelectElement>("select");
@@ -95,6 +113,8 @@ describe("realtime lobby preview", () => {
     document.body.append(element);
     await element.updateComplete;
     element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await element.updateComplete;
 
     const startButton = [...element.querySelectorAll("button")].find(
@@ -154,6 +174,8 @@ describe("realtime lobby preview", () => {
     await element.updateComplete;
     element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
     await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
 
     const addButton = [...element.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Agregar jugador de prueba"),
@@ -200,9 +222,16 @@ describe("realtime lobby preview", () => {
     },
   );
 
-  it("simulates joining from an invite link with fake host data", async () => {
+  it("joins the invite room through the LobbySession handshake", async () => {
     history.replaceState({}, "", "/?lobby-preview&room=ABC234");
     saveGuestNickname("Office peer");
+    vi.mocked(LobbySession.joinPeer).mockImplementation(async (options) => {
+      options.onRoster([
+        { persistentID: "host0001", nickname: "Office host", host: true },
+        { persistentID: options.clientID, nickname: options.nickname },
+      ]);
+      return { close: vi.fn() } as unknown as LobbySession;
+    });
     if (!customElements.get("realtime-lobby-preview")) {
       customElements.define("realtime-lobby-preview", RealtimeLobbyPreview);
     }
@@ -211,19 +240,15 @@ describe("realtime lobby preview", () => {
     ) as RealtimeLobbyPreview;
     document.body.append(element);
     await element.updateComplete;
-
-    const joinButton = [...element.querySelectorAll("button")].find((button) =>
-      button.textContent?.includes("Unirme"),
-    );
-    joinButton?.click();
-    await element.updateComplete;
-    await new Promise((resolve) => setTimeout(resolve, 175));
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
     await element.updateComplete;
 
     expect(element.textContent).toContain("ABC234");
-    expect(element.textContent).toContain("Host de prueba");
+    expect(element.textContent).toContain("Office host");
     expect(element.textContent).toContain("Office peer");
-    expect(element.textContent).toContain("sala de demostración");
+    expect(LobbySession.joinPeer).toHaveBeenCalledWith(
+      expect.objectContaining({ roomCode: "ABC234", nickname: "Office peer" }),
+    );
     expect(
       [...element.querySelectorAll("button")].some(
         (button) => button.textContent?.trim() === "Empezar",
@@ -231,8 +256,7 @@ describe("realtime lobby preview", () => {
     ).toBe(false);
   });
 
-  it("shows the not-found message when the host does not reply before timeout", async () => {
-    vi.useFakeTimers();
+  it("shows the not-found message when the lobby handshake fails", async () => {
     saveGuestNickname("Office peer");
     if (!customElements.get("realtime-lobby-preview")) {
       customElements.define("realtime-lobby-preview", RealtimeLobbyPreview);
@@ -254,8 +278,7 @@ describe("realtime lobby preview", () => {
       .find((button) => button.textContent?.includes("Unirme"))
       ?.click();
     await element.updateComplete;
-
-    await vi.advanceTimersByTimeAsync(JOIN_TIMEOUT_MS);
+    await Promise.resolve();
     await element.updateComplete;
 
     expect(element.textContent).toContain(
