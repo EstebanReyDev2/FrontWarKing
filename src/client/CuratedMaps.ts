@@ -3,9 +3,10 @@ import { GameMapType, maps } from "@openfront/engine-api/game/Maps.gen";
 export interface CuratedMap {
   map: GameMapType;
   reason: string;
+  badge?: string;
 }
 
-// Normal map size only; omit the compact modifier and the oversized World map.
+// Normal map size only; omit the compact modifier.
 // Favor recognizable, geographically varied regions with multiple approaches.
 export const curatedMaps: readonly CuratedMap[] = [
   {
@@ -67,6 +68,11 @@ export const curatedMaps: readonly CuratedMap[] = [
   {
     map: GameMapType.SouthAmerica,
     reason: "Eje norte-sur con costa y corredores interiores.",
+  },
+  {
+    map: GameMapType.World,
+    reason: "Mapa mundial para partidas largas con muchos frentes.",
+    badge: "Mapa grande",
   },
 ];
 

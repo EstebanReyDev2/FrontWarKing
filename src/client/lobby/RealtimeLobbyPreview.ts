@@ -5,6 +5,7 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { allLobbyMaps, curatedMaps } from "../CuratedMaps";
 import { isPreviewRoute } from "../RouteMode";
+import { terrainMapFileLoader } from "../TerrainMapFileLoader";
 import { getGuestIdentity, saveGuestNickname } from "./GuestIdentity";
 import { LaunchRealtimeGameEvent } from "./LobbyEvents";
 import {
@@ -45,6 +46,7 @@ export class RealtimeLobbyPreview extends LitElement {
   @state() private isHost = false;
   @state() private selectedMap = curatedMaps[0].map;
   @state() private showAllMaps = false;
+  @state() private mapPreviewFailed = false;
   @state() private gameStartInfo: WireGameStartInfo | null = null;
   @property({ attribute: false }) eventBus: EventBus | null = null;
   private lobbySession?: LobbySession;
@@ -193,6 +195,12 @@ export class RealtimeLobbyPreview extends LitElement {
       ? allLobbyMaps
       : curatedMaps.map(({ map }) => map);
     const selectedMapLabel = this.selectedMap;
+    const selectedCurated = curatedMaps.find(
+      ({ map }) => map === this.selectedMap,
+    );
+    const mapPreviewUrl = terrainMapFileLoader.getMapData(
+      this.selectedMap,
+    ).webpPath;
     return html`
       <section
         class="flex flex-col gap-5 rounded-2xl border border-white/10 bg-surface/80 p-5 shadow-xl sm:p-7"
@@ -279,6 +287,7 @@ export class RealtimeLobbyPreview extends LitElement {
                 @change=${(event: Event) => {
                   this.selectedMap = (event.target as HTMLSelectElement)
                     .value as GameMapType;
+                  this.mapPreviewFailed = false;
                   this.gameStartInfo = null;
                   delete window.__debugGameStartInfo;
                 }}
@@ -304,12 +313,39 @@ export class RealtimeLobbyPreview extends LitElement {
                 : "Ver todos los mapas"}
             </button>
           </div>
-          ${!this.showAllMaps
-            ? html`<p class="text-xs text-white/50">
-                ${curatedMaps.find(({ map }) => map === this.selectedMap)
-                  ?.reason ?? "Mapa recomendado para partidas de oficina."}
-              </p>`
-            : nothing}
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div
+              class="relative h-[144px] w-full max-w-[240px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/20"
+            >
+              ${this.mapPreviewFailed
+                ? html`<p
+                    class="flex h-full items-center justify-center px-3 text-center text-xs text-white/50"
+                  >
+                    Vista previa no disponible.
+                  </p>`
+                : html`<img
+                    alt="Vista previa del mapa"
+                    class="h-full w-full object-cover"
+                    src=${mapPreviewUrl}
+                    @error=${() => (this.mapPreviewFailed = true)}
+                  />`}
+            </div>
+            <div class="flex min-w-0 flex-col gap-2">
+              ${selectedCurated?.badge
+                ? html`<span
+                    class="self-start rounded bg-aquarius/15 px-2 py-1 text-xs font-semibold text-aquarius"
+                  >
+                    ${selectedCurated.badge}
+                  </span>`
+                : nothing}
+              ${!this.showAllMaps
+                ? html`<p class="text-xs text-white/50">
+                    ${selectedCurated?.reason ??
+                    "Mapa recomendado para partidas de oficina."}
+                  </p>`
+                : nothing}
+            </div>
+          </div>
         </section>
         ${this.error
           ? html`<p class="text-sm text-red-300" role="alert">${this.error}</p>`

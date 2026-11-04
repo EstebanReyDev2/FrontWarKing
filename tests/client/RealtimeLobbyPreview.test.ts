@@ -82,7 +82,7 @@ describe("realtime lobby preview", () => {
     expect(element.querySelector('[role="status"]')?.textContent).toContain(
       "Necesitás al menos 2 jugadores para empezar",
     );
-    expect(element.querySelector("select")?.options).toHaveLength(15);
+    expect(element.querySelector("select")?.options).toHaveLength(16);
   });
 
   it("changes the selected map and expands/collapses the complete catalog", async () => {
@@ -115,8 +115,65 @@ describe("realtime lobby preview", () => {
       .find((button) => button.textContent?.includes("Ver mapas recomendados"))
       ?.click();
     await element.updateComplete;
-    expect(mapSelect.options).toHaveLength(15);
-    expect(mapSelect.value).not.toBe("World");
+    expect(mapSelect.options).toHaveLength(16);
+    expect(mapSelect.value).toBe("World");
+  });
+
+  it("updates the map preview when the selection changes", async () => {
+    saveGuestNickname("Office host");
+    element = document.createElement(
+      "realtime-lobby-preview",
+    ) as RealtimeLobbyPreview;
+    document.body.append(element);
+    await element.updateComplete;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+
+    const preview = () =>
+      element.querySelector<HTMLImageElement>(
+        'img[alt="Vista previa del mapa"]',
+      );
+    expect(preview()?.getAttribute("src")).toContain(
+      "maps/africa/thumbnail.webp",
+    );
+
+    const mapSelect = element.querySelector<HTMLSelectElement>("select");
+    if (!mapSelect) throw new Error("map selector not found");
+    mapSelect.value = "Europe";
+    mapSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await element.updateComplete;
+
+    expect(preview()?.getAttribute("src")).toContain(
+      "maps/europe/thumbnail.webp",
+    );
+  });
+
+  it("shows the large-map badge for World in the curated list", async () => {
+    saveGuestNickname("Office host");
+    element = document.createElement(
+      "realtime-lobby-preview",
+    ) as RealtimeLobbyPreview;
+    document.body.append(element);
+    await element.updateComplete;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+
+    const mapSelect = element.querySelector<HTMLSelectElement>("select");
+    if (!mapSelect) throw new Error("map selector not found");
+    mapSelect.value = "World";
+    mapSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await element.updateComplete;
+
+    expect(element.textContent).toContain("Mapa grande");
+    expect(
+      element
+        .querySelector<HTMLImageElement>('img[alt="Vista previa del mapa"]')
+        ?.getAttribute("src"),
+    ).toContain("maps/world/thumbnail.webp");
   });
 
   it("does not count UI-only fake peers toward the realtime start requirement", async () => {
