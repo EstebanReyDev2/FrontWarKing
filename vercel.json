@@ -1,0 +1,40 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build-prod && GIT_COMMIT=\"${VERCEL_GIT_COMMIT_SHA:-dev}\" tsx src/server/RenderStaticIndex.ts --environment-only > static/index.render.html && mv static/index.render.html static/index.html",
+  "outputDirectory": "static",
+  "redirects": [
+    {
+      "source": "/",
+      "missing": [{ "type": "query", "key": "lobby-preview" }],
+      "destination": "/?lobby-preview",
+      "permanent": false
+    },
+    {
+      "source": "/game/:path*",
+      "destination": "/?lobby-preview",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/_assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
