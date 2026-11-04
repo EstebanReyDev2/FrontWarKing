@@ -57,6 +57,8 @@ import "./LangSelector";
 import { LangSelector } from "./LangSelector";
 import { initLayout } from "./Layout";
 import { loadModal, prefetchModals, whenModalLoaded } from "./LazyModals";
+import { LaunchRealtimeGameEvent } from "./lobby/LobbyEvents";
+import { RealtimeLobbyPreview } from "./lobby/RealtimeLobbyPreview";
 import {
   SendKickPlayerIntentEvent,
   SendToggleGameStartTimer,
@@ -473,6 +475,20 @@ class Client {
     this.gameModeSelector = document.querySelector(
       "game-mode-selector",
     ) as GameModeSelector;
+
+    const realtimeLobbyPreview = document.querySelector(
+      "realtime-lobby-preview",
+    ) as RealtimeLobbyPreview | null;
+    if (realtimeLobbyPreview) realtimeLobbyPreview.eventBus = this.eventBus;
+    this.eventBus.on(LaunchRealtimeGameEvent, (event) => {
+      void this.handleRealtimeGameLaunch(event).catch((error: unknown) => {
+        console.error("realtime game launch failed:", error);
+        document
+          .getElementById("page-realtime-lobby-preview")
+          ?.classList.remove("is-game-started");
+        this.joinInFlight = false;
+      });
+    });
 
     window.addEventListener("beforeunload", async () => {
       console.log("Browser is closing");
@@ -1414,6 +1430,86 @@ class Client {
       }
 
       // Store current URL for popstate confirmation
+      this.currentUrl = window.location.href;
+    });
+  }
+
+  /** Bypasses the legacy auth/join funnel for the anonymous realtime lobby. */
+  private async handleRealtimeGameLaunch(
+    event: LaunchRealtimeGameEvent,
+  ): Promise<void> {
+    const { start, clientID, nickname } = event;
+    if (this.lobbyHandle !== null) {
+      this.lobbyHandle.stop(true);
+      this.lobbyHandle = null;
+    }
+    const joinToken = performance.now();
+    this.mostRecentJoinEvent = joinToken;
+    this.joinInFlight = true;
+
+    const player = start.gameStartInfo.players.find(
+      (candidate) => candidate.clientID === clientID,
+    );
+    if (!player) {
+      this.joinInFlight = false;
+      throw new Error("LobbyStart roster does not include this player");
+    }
+
+    const { joinLobby } = await loadGameClient();
+    if (this.mostRecentJoinEvent !== joinToken) return;
+    const newLobbyHandle = joinLobby(this.eventBus, {
+      gameID: start.gameID,
+      cosmetics: {},
+      turnstileToken: null,
+      playerName: player.username || nickname,
+      playerClanTag: null,
+      playerRole: null,
+      gameStartInfo: start.gameStartInfo,
+      realtime: {
+        clientID,
+        hostID: start.hostID,
+        allowGeneralHello: true,
+      },
+    });
+    if (this.mostRecentJoinEvent !== joinToken) {
+      newLobbyHandle.stop(true);
+      return;
+    }
+    this.lobbyHandle = newLobbyHandle;
+    this.joinInFlight = false;
+
+    newLobbyHandle.prestart.then(() => {
+      this.menuTornDown = true;
+      document.dispatchEvent(new CustomEvent("game-starting"));
+      this.closeMenu();
+      gamePortal.loadingStart();
+      const startingModal = document.querySelector(
+        "game-starting-modal",
+      ) as GameStartingModal | null;
+      startingModal?.show();
+    });
+
+    newLobbyHandle.join.then(() => {
+      this.gameModeSelector.stop();
+      incrementGamesPlayed();
+      if (window.PageOS?.session?.newPageView) {
+        window.PageOS.session.newPageView();
+      }
+      gamePortal.loadingStop();
+      gamePortal.gameplayStart();
+      setInGameSignal(true);
+      if (window.location.hash === "" || window.location.hash === "#") {
+        history.replaceState(null, "", window.location.origin + "#refresh");
+      }
+      history.pushState(
+        null,
+        "",
+        currentPagePath(
+          !this.userSettings.lobbyIdVisibility()
+            ? "/streamer-mode"
+            : `${ClientEnv.gamePath(start.gameID)}?live`,
+        ),
+      );
       this.currentUrl = window.location.href;
     });
   }

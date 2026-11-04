@@ -1,16 +1,19 @@
 import { GameMapType } from "@openfront/engine-api/game/Maps.gen";
+import type { EventBus } from "@openfront/shared/EventBus";
 import type { WireGameStartInfo } from "@openfront/shared/WireSchemas";
 import { html, LitElement, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { allLobbyMaps, curatedMaps } from "../CuratedMaps";
 import { isPreviewRoute } from "../RouteMode";
 import { getGuestIdentity, saveGuestNickname } from "./GuestIdentity";
+import { LaunchRealtimeGameEvent } from "./LobbyEvents";
 import {
   createRoomCode,
   isValidRoomCode,
   MAX_PLAYERS,
   normalizeRoomCode,
 } from "./LobbyRules";
+import type { LobbyStart } from "./LobbySchemas";
 import { LobbyRoomCollisionError, LobbySession } from "./LobbySession";
 import {
   canStartPreviewGame,
@@ -43,6 +46,7 @@ export class RealtimeLobbyPreview extends LitElement {
   @state() private selectedMap = curatedMaps[0].map;
   @state() private showAllMaps = false;
   @state() private gameStartInfo: WireGameStartInfo | null = null;
+  @property({ attribute: false }) eventBus: EventBus | null = null;
   private lobbySession?: LobbySession;
 
   connectedCallback(): void {
@@ -178,7 +182,10 @@ export class RealtimeLobbyPreview extends LitElement {
     const inviteURL = new URL(window.location.href);
     inviteURL.searchParams.set("lobby-preview", "");
     inviteURL.searchParams.set("room", this.roomCode);
-    const canStart = canStartPreviewGame(this.isHost, this.players.length);
+    const canStart = canStartPreviewGame(
+      this.isHost,
+      this.lobbySession?.roster.length ?? 0,
+    );
     const showTestPeerControls = this.isHost && isPreviewRoute();
     const canAddTestPeer =
       showTestPeerControls && this.players.length < MAX_PLAYERS;
@@ -304,6 +311,9 @@ export class RealtimeLobbyPreview extends LitElement {
               </p>`
             : nothing}
         </section>
+        ${this.error
+          ? html`<p class="text-sm text-red-300" role="alert">${this.error}</p>`
+          : nothing}
         <p
           class="rounded-lg border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"
         >
@@ -327,7 +337,7 @@ export class RealtimeLobbyPreview extends LitElement {
                 title=${canStart
                   ? "Preparar configuración (no inicia la partida)"
                   : "Se necesitan al menos 2 jugadores."}
-                @click=${() => this.prepareStart()}
+                @click=${() => void this.prepareStart()}
               >
                 Empezar
               </button>`
@@ -365,6 +375,7 @@ export class RealtimeLobbyPreview extends LitElement {
               this.players = this.mergeTestPeers(players);
             },
             onError: (error) => (this.error = error.message),
+            onGameStart: (start) => this.onGameStart(start),
           });
           if (!this.isConnected) {
             await this.lobbySession.close();
@@ -415,6 +426,8 @@ export class RealtimeLobbyPreview extends LitElement {
               "El host se desconectó. La sala ya no está disponible.";
           })();
         },
+        onStartTimeout: () => this.onStartTimeout(),
+        onGameStart: (start) => this.onGameStart(start),
         onError: (error) => (this.error = error.message),
       });
       if (!this.isConnected) {
@@ -456,13 +469,51 @@ export class RealtimeLobbyPreview extends LitElement {
     delete window.__debugGameStartInfo;
   }
 
-  private prepareStart(): void {
-    if (!canStartPreviewGame(this.isHost, this.players.length)) return;
-    this.gameStartInfo = createPreviewGameStartInfo(
+  private async prepareStart(): Promise<void> {
+    const session = this.lobbySession;
+    if (!session || !canStartPreviewGame(this.isHost, session.roster.length))
+      return;
+    const gameStartInfo = createPreviewGameStartInfo(
       this.selectedMap,
-      this.players,
+      session.roster,
     );
-    window.__debugGameStartInfo = this.gameStartInfo;
+    this.gameStartInfo = gameStartInfo;
+    window.__debugGameStartInfo = gameStartInfo;
+    try {
+      await session.startGame(gameStartInfo);
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : String(error);
+      this.gameStartInfo = null;
+      delete window.__debugGameStartInfo;
+    }
+  }
+
+  private onGameStart(start: LobbyStart): void {
+    this.gameStartInfo = start.gameStartInfo;
+    window.__debugGameStartInfo = start.gameStartInfo;
+    this.classList.add("is-game-started");
+    if (this.eventBus === null) {
+      this.classList.remove("is-game-started");
+      this.error = "No se pudo iniciar la partida: falta el canal de eventos.";
+    } else {
+      this.eventBus.emit(
+        new LaunchRealtimeGameEvent(
+          start,
+          getGuestIdentity().persistentID,
+          this.nickname,
+        ),
+      );
+    }
+    const session = this.lobbySession;
+    this.lobbySession = undefined;
+    void session?.close();
+  }
+
+  private onStartTimeout(): void {
+    void (async () => {
+      await this.leaveRoom();
+      this.error = "El host cerró antes de empezar.";
+    })();
   }
 
   private addTestPeer(): void {

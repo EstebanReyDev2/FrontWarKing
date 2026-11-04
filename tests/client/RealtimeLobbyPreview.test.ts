@@ -1,5 +1,7 @@
+import { EventBus } from "@openfront/shared/EventBus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveGuestNickname } from "../../src/client/lobby/GuestIdentity";
+import { LaunchRealtimeGameEvent } from "../../src/client/lobby/LobbyEvents";
 import { LobbySession } from "../../src/client/lobby/LobbySession";
 import { RealtimeLobbyPreview } from "../../src/client/lobby/RealtimeLobbyPreview";
 
@@ -16,7 +18,19 @@ describe("realtime lobby preview", () => {
           host: true,
         },
       ]);
-      return { close: vi.fn() } as unknown as LobbySession;
+      return {
+        close: vi.fn(),
+        get roster() {
+          return [
+            {
+              persistentID: options.clientID,
+              nickname: options.nickname,
+              host: true,
+            },
+          ];
+        },
+        startGame: vi.fn(),
+      } as unknown as LobbySession;
     });
     vi.spyOn(LobbySession, "joinPeer").mockRejectedValue(
       new Error("Sala no encontrada o host desconectado"),
@@ -105,7 +119,7 @@ describe("realtime lobby preview", () => {
     expect(mapSelect.value).not.toBe("World");
   });
 
-  it("prepares a fake gameStartInfo only for a host with at least two players", async () => {
+  it("does not count UI-only fake peers toward the realtime start requirement", async () => {
     saveGuestNickname("Office host");
     element = document.createElement(
       "realtime-lobby-preview",
@@ -130,39 +144,84 @@ describe("realtime lobby preview", () => {
       ?.click();
     await element.updateComplete;
     expect(element.textContent).toContain("2/7");
-    expect(startButton?.disabled).toBe(false);
-    expect(element.querySelector('[role="status"]')).toBeNull();
+    expect(startButton?.disabled).toBe(true);
+    expect(element.querySelector('[role="status"]')?.textContent).toContain(
+      "al menos 2 jugadores",
+    );
+    expect(window.__debugGameStartInfo).toBeUndefined();
+  });
 
-    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-    const documentDispatchSpy = vi.spyOn(document, "dispatchEvent");
-    startButton?.click();
+  it("starts with the canonical roster, a distinct game ID, and emits the launch event", async () => {
+    const realRoster = [
+      { persistentID: "host0001", nickname: "Office host", host: true },
+      { persistentID: "peer0001", nickname: "Office peer" },
+    ];
+    vi.mocked(LobbySession.createHost).mockImplementation(async (options) => {
+      options.onRoster(realRoster);
+      return {
+        close: vi.fn(),
+        get roster() {
+          return realRoster;
+        },
+        startGame: vi.fn(async (info) => {
+          options.onGameStart?.({
+            type: "lobby_start",
+            v: 1,
+            roomCode: options.roomCode,
+            gameID: info.gameID,
+            hostID: options.clientID,
+            gameStartInfo: info,
+          });
+        }),
+      } as unknown as LobbySession;
+    });
+    saveGuestNickname("Office host");
+    element = document.createElement(
+      "realtime-lobby-preview",
+    ) as RealtimeLobbyPreview;
+    const eventBus = new EventBus();
+    element.eventBus = eventBus;
+    const launched = vi.fn();
+    eventBus.on(LaunchRealtimeGameEvent, launched);
+    document.body.append(element);
+    await element.updateComplete;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await element.updateComplete;
 
-    expect(window.__debugGameStartInfo?.config).toMatchObject({
+    const startButton = [...element.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Empezar",
+    );
+    expect(startButton?.disabled).toBe(false);
+    [...element.querySelectorAll("button")]
+      .find((button) =>
+        button.textContent?.includes("Agregar jugador de prueba"),
+      )
+      ?.click();
+    await element.updateComplete;
+    startButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const event = launched.mock.calls[0]?.[0] as LaunchRealtimeGameEvent;
+    expect(event).toBeInstanceOf(LaunchRealtimeGameEvent);
+    expect(event.start.gameID).toMatch(/^[A-Za-z0-9]{8,10}$/);
+    expect(event.start.gameID).not.toBe(
+      element.textContent?.match(/[A-HJ-NP-Z2-9]{6}/)?.[0],
+    );
+    expect(event.start.gameStartInfo.config).toMatchObject({
       gameMap: "Africa",
-      gameMapSize: "Normal",
       gameMode: "Free For All",
       maxPlayers: 2,
       bots: 0,
       nations: "disabled",
       randomSpawn: false,
     });
-    expect(window.__debugGameStartInfo?.players).toHaveLength(2);
-    expect(window.__debugGameStartInfo?.players[1]).toMatchObject({
-      clientID: "test-peer-2",
-      username: "Jugador de prueba 2",
-    });
-    expect(element.textContent).toContain(
-      "Config lista: Africa — esperando B3-3b",
-    );
-    expect(dispatchSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "join-lobby" }),
-    );
-    expect(documentDispatchSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "join-lobby" }),
-    );
-    dispatchSpy.mockRestore();
-    documentDispatchSpy.mockRestore();
+    expect(
+      event.start.gameStartInfo.players.map(({ clientID }) => clientID),
+    ).toEqual(["host0001", "peer0001"]);
+    expect(
+      event.start.gameStartInfo.players.map(({ clientID }) => clientID),
+    ).not.toContain("test-peer-2");
   });
 
   it("adds fake peers to the player limit and removes them again", async () => {
@@ -226,11 +285,17 @@ describe("realtime lobby preview", () => {
     history.replaceState({}, "", "/?lobby-preview&room=ABC234");
     saveGuestNickname("Office peer");
     vi.mocked(LobbySession.joinPeer).mockImplementation(async (options) => {
-      options.onRoster([
+      const roster = [
         { persistentID: "host0001", nickname: "Office host", host: true },
         { persistentID: options.clientID, nickname: options.nickname },
-      ]);
-      return { close: vi.fn() } as unknown as LobbySession;
+      ];
+      options.onRoster(roster);
+      return {
+        close: vi.fn(),
+        get roster() {
+          return roster;
+        },
+      } as unknown as LobbySession;
     });
     if (!customElements.get("realtime-lobby-preview")) {
       customElements.define("realtime-lobby-preview", RealtimeLobbyPreview);

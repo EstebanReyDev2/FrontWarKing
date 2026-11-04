@@ -7,10 +7,12 @@ import { supabaseRealtimeConfig } from "../netcode/SupabaseConfig";
 import { JOIN_TIMEOUT_MS, MAX_PLAYERS } from "./LobbyRules";
 import {
   LobbyMessageSchema,
+  LobbyStartSchema,
   type LobbyHeartbeat,
   type LobbyMessage,
   type LobbyPlayer,
   type LobbyRoster,
+  type LobbyStart,
 } from "./LobbySchemas";
 
 export const LOBBY_HEARTBEAT_MS = 2_000;
@@ -25,6 +27,8 @@ export type LobbySessionOptions = {
   client?: SupabaseClientLike;
   onRoster: (players: LobbyPlayer[]) => void;
   onHostLost?: () => void;
+  onGameStart?: (start: LobbyStart) => void;
+  onStartTimeout?: () => void;
   onError?: (error: Error) => void;
 };
 
@@ -48,6 +52,8 @@ export class LobbySession {
   private closed = false;
   private probing = false;
   private conflictingHostID: string | null = null;
+  private phase: "lobby" | "starting" = "lobby";
+  private startTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingJoin:
     | {
         resolve: (roster: LobbyRoster) => void;
@@ -56,6 +62,8 @@ export class LobbySession {
     | undefined;
   private onRoster: LobbySessionOptions["onRoster"];
   private onHostLost?: LobbySessionOptions["onHostLost"];
+  private onGameStart?: LobbySessionOptions["onGameStart"];
+  private onStartTimeout?: LobbySessionOptions["onStartTimeout"];
   private onError?: LobbySessionOptions["onError"];
 
   private constructor(
@@ -73,6 +81,8 @@ export class LobbySession {
     this.hostID = this.isHost ? clientID : "";
     this.onRoster = options.onRoster;
     this.onHostLost = options.onHostLost;
+    this.onGameStart = options.onGameStart;
+    this.onStartTimeout = options.onStartTimeout;
     this.onError = options.onError;
     this.channel.on(
       "broadcast",
@@ -177,12 +187,63 @@ export class LobbySession {
     return this.hostID;
   }
 
+  async startGame(gameStartInfo: LobbyStart["gameStartInfo"]): Promise<void> {
+    if (!this.isHost || this.closed || this.phase !== "lobby") {
+      throw new Error("Only the lobby host can start the game once");
+    }
+    const canonicalPlayers = this.roster;
+    const wirePlayers = gameStartInfo.players;
+    if (
+      canonicalPlayers.length !== wirePlayers.length ||
+      canonicalPlayers.some(
+        (player, index) =>
+          player.persistentID !== wirePlayers[index]?.clientID ||
+          player.nickname !== wirePlayers[index]?.username,
+      )
+    ) {
+      throw new Error("Game start roster does not match the lobby roster");
+    }
+    if (gameStartInfo.gameID === this.roomCode) {
+      throw new Error("Game ID must differ from the six-character room code");
+    }
+
+    this.phase = "starting";
+    const start: LobbyStart = {
+      type: "lobby_start",
+      v: 1,
+      roomCode: this.roomCode,
+      gameID: gameStartInfo.gameID,
+      gameStartInfo,
+      hostID: this.clientID,
+    };
+    LobbyStartSchema.parse(start);
+    try {
+      await this.publish({
+        type: "heartbeat",
+        roomCode: this.roomCode,
+        clientID: this.clientID,
+        hostID: this.clientID,
+        starting: true,
+      });
+      await this.publish(start);
+      this.stopHeartbeat();
+      this.onGameStart?.(start);
+    } catch (error) {
+      this.phase = "lobby";
+      throw error;
+    }
+  }
+
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     if (this.heartbeatTimer !== null) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.startTimeout !== null) {
+      clearTimeout(this.startTimeout);
+      this.startTimeout = null;
     }
     this.pendingJoin?.reject(new Error("Lobby connection closed"));
     await this.channel.unsubscribe();
@@ -266,11 +327,19 @@ export class LobbySession {
       case "heartbeat":
         this.receiveHeartbeat(message);
         break;
+      case "lobby_start":
+        this.receiveStart(message);
+        break;
     }
   }
 
   private receiveRoster(roster: LobbyRoster): void {
-    if (this.isHost || roster.hostID === this.clientID) return;
+    if (
+      this.isHost ||
+      this.phase !== "lobby" ||
+      roster.hostID === this.clientID
+    )
+      return;
     this.hostID = roster.hostID;
     this.players = roster.players;
     this.lastHostHeartbeat = Date.now();
@@ -283,7 +352,9 @@ export class LobbySession {
           new Error(
             roster.rejection === "room_full"
               ? "La sala está llena."
-              : "No se pudo ingresar a la sala.",
+              : roster.rejection === "game_started"
+                ? "Partida ya iniciada."
+                : "No se pudo ingresar a la sala.",
           ),
         );
       }
@@ -315,11 +386,46 @@ export class LobbySession {
       heartbeat.hostID === this.hostID
     ) {
       this.lastHostHeartbeat = Date.now();
+      if (heartbeat.starting === true && this.startTimeout === null) {
+        this.startTimeout = setTimeout(() => {
+          this.startTimeout = null;
+          if (this.phase !== "lobby" || this.closed) return;
+          this.onStartTimeout?.();
+          void this.close();
+        }, LOBBY_HOST_TIMEOUT_MS);
+      }
     }
+  }
+
+  private receiveStart(start: LobbyStart): void {
+    if (
+      this.isHost ||
+      this.closed ||
+      this.phase !== "lobby" ||
+      start.hostID !== this.hostID ||
+      start.gameID !== start.gameStartInfo.gameID
+    ) {
+      return;
+    }
+    this.phase = "starting";
+    if (this.startTimeout !== null) {
+      clearTimeout(this.startTimeout);
+      this.startTimeout = null;
+    }
+    this.stopHeartbeat();
+    this.onGameStart?.(start);
   }
 
   private async acceptPeer(clientID: string, nickname: string): Promise<void> {
     if (clientID === this.clientID) return;
+    if (this.phase !== "lobby") {
+      await this.publishRoster({
+        responseTo: clientID,
+        accepted: false,
+        rejection: "game_started",
+      });
+      return;
+    }
     const existing = this.players.some(
       (player) => player.persistentID === clientID,
     );
@@ -375,6 +481,12 @@ export class LobbySession {
       }
       void this.sendHeartbeat();
     }, LOBBY_HEARTBEAT_MS);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer === null) return;
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 
   private async sendHeartbeat(): Promise<void> {

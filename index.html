@@ -202,6 +202,11 @@
         z-index: 9999;
         overflow-y: auto;
       }
+
+      html.is-preview-mode #page-realtime-lobby-preview.is-game-started,
+      html.is-realtime-dev-mode #page-realtime-lobby-preview.is-game-started {
+        display: none !important;
+      }
     </style>
     <script>
       // Halloween theme (src/client/halloween.css), Oct 25 through Nov 1 local
