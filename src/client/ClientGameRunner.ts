@@ -274,6 +274,9 @@ export function joinLobby(
     if (message.type === "start") {
       // Trigger prestart for singleplayer games
       resolvePrestart();
+      console.log(
+        `[DEBUG-HANDOFF] Received start message, initializing game runner gameID=${lobbyConfig.gameID} myClientID=${message.myClientID}`,
+      );
       // Everything in the start message EXCEPT the group token. This log is
       // the whole message verbatim and players paste it into bug reports;
       // the token is the one field in it that must not travel that way.

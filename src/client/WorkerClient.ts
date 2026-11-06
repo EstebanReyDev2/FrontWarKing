@@ -135,6 +135,9 @@ export class WorkerClient {
   async initialize(): Promise<void> {
     // The engine fetches nothing: it gets the map in the init message.
     const { gameMap, gameMapSize } = this.gameStartInfo.config;
+    console.log(
+      `[DEBUG-HANDOFF] WorkerClient initializing worker map=${gameMap} size=${gameMapSize} clientID=${this.clientID}`,
+    );
     const created = createGameWorker();
     let map: MapFiles;
     try {

@@ -525,6 +525,9 @@ export class RealtimeLobbyPreview extends LitElement {
   }
 
   private onGameStart(start: LobbyStart): void {
+    console.log(
+      `[DEBUG-HANDOFF] Lobby onGameStart gameID=${start.gameID} me=${getGuestIdentity().persistentID} host=${start.hostID}`,
+    );
     this.gameStartInfo = start.gameStartInfo;
     window.__debugGameStartInfo = start.gameStartInfo;
     this.classList.add("is-game-started");
