@@ -61,7 +61,10 @@ export type RealtimeSessionOptions = {
 export const REALTIME_TURNS_PER_BATCH = 2;
 export const REALTIME_MAX_INTENTS_PER_TURN = 64;
 export const REALTIME_HEARTBEAT_MS = 1_000;
-export const REALTIME_HOST_LOST_MS = 3_000;
+// Temporary: the host's main thread is blocked while it loads the map and
+// initialises WebGL, so it cannot publish heartbeats for several seconds after
+// sending start. A 3s window declared the host dead on every first load.
+export const REALTIME_HOST_LOST_MS = 10_000;
 export const REALTIME_ACK_MS = 1_000;
 export const REALTIME_INTENT_FLUSH_MS = 50;
 export const REALTIME_MAX_INTENTS_BUFFER = 32;

@@ -11,6 +11,7 @@ import type {
   WireGameStartInfo,
 } from "@openfront/shared/WireSchemas";
 import { RealtimeSession } from "src/client/netcode/RealtimeSession";
+import { REALTIME_HOST_LOST_MS } from "src/client/netcode/RealtimeSession";
 import type {
   RealtimeTransport,
   TransportListener,
@@ -318,7 +319,12 @@ describe("RealtimeSession", () => {
     session.network.disconnect(HOST_ID);
     await session.host.leaveGame();
 
-    await vi.advanceTimersByTimeAsync(4_500);
+    // The detector polls every hostLostMs/3, so overshoot the window by one
+    // full poll interval: the tick that observes the deadline is the first one
+    // after it.
+    await vi.advanceTimersByTimeAsync(
+      REALTIME_HOST_LOST_MS + Math.floor(REALTIME_HOST_LOST_MS / 3) + 1,
+    );
     const errors = session.peerMessages.filter(
       (message) => message.type === "error",
     );
