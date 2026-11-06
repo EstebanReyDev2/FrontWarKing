@@ -160,9 +160,6 @@ export class RealtimeSession {
     if (this.host && this.gameStartInfo !== null) {
       this.ctx = createGameWireContext(this.gameStartInfo.players);
     }
-    console.log(
-      `[DEBUG-HANDOFF] RealtimeSession constructed gameID=${opts.gameID} clientID=${opts.clientID} hostID=${opts.hostID} isHost=${this.host} hasGameStartInfo=${this.gameStartInfo !== null}`,
-    );
   }
 
   get isHost(): boolean {
@@ -210,9 +207,6 @@ export class RealtimeSession {
       }) ?? null;
     await this.opts.transport.subscribe(this.clientID, (packet) =>
       this.onPacket(packet),
-    );
-    console.log(
-      `[DEBUG-HANDOFF] RealtimeSession connected gameID=${this.opts.gameID} clientID=${this.clientID} isHost=${this.host}`,
     );
     onconnect();
   }
@@ -407,9 +401,6 @@ export class RealtimeSession {
   }
 
   private handleHello(from: string, control: Hello): void {
-    console.log(
-      `[DEBUG-HANDOFF] Host received hello from=${from} me=${this.clientID} coldStart=${control.coldStart} startSent=${this.startSent} startSending=${this.startSending}`,
-    );
     if (from === this.clientID) return;
     this.peers.set(from, { nickname: control.nickname });
     const count = (this.helloCounts.get(from) ?? 0) + 1;
@@ -476,17 +467,11 @@ export class RealtimeSession {
       return;
     }
     this.startSent = true;
-    console.log(
-      `[DEBUG-HANDOFF] Host sent start to=${peerID} myClientID=${this.clientID}`,
-    );
     this.deliverStart(info, this.clientID);
     await this.maybeStartMaker();
   }
 
   private handleStart(control: Start): void {
-    console.log(
-      `[DEBUG-HANDOFF] Received start control myClientID=${control.myClientID} me=${this.clientID} started=${this.started}`,
-    );
     if (control.myClientID !== this.clientID) return;
     if (this.started) return;
     this.gameStartInfo = control.gameStartInfo;
@@ -512,9 +497,6 @@ export class RealtimeSession {
   }
 
   private deliverStart(info: WireGameStartInfo, myClientID: string): void {
-    console.log(
-      `[DEBUG-HANDOFF] Delivering start to ClientGameRunner gameID=${this.opts.gameID} myClientID=${myClientID} isHost=${this.host}`,
-    );
     this.started = true;
     this.lastHeardAt = this.now();
     if (this.host && this.receiver === null && this.ctx !== null) {

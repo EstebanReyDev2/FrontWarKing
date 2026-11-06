@@ -118,9 +118,20 @@ runtime.
   Si el build falla intentando clonarlo, hay que dejarlo vacío o quitar el
   submódulo del fork.
 - **Tamaño del repo**: el clon trae `resources/maps` y `proprietary`. El build
-  estático pesa ~675 MB; el límite de Deployment Storage de Hobby es 10 GB y
-  retiene 3 deploys de producción más 3 recientes, así que alcanza, pero el primer
-  clon tarda.
+  estático pesa ~675 MB. Vercel no publica un límite de tamaño de output para
+  builds desde Git: el límite de 100 MB de Hobby aplica solo a los source files
+  de un deploy por CLI, y la doc de "Files" dice explícitamente que no hay tope
+  para los archivos generados durante un build. El techo real es el build de 45
+  minutos. Deployment Storage se mantiene a raya con la retención por defecto de
+  30 días.
+- **`api.<DOMAIN>` no existe en un deploy estático**: el cliente asume un backend
+  HTTP en `https://api.<DOMAIN>` (`src/client/ApiBase.ts`) para auth y perfil. En
+  Vercel ese subdominio resuelve por wildcard pero no tiene deployment detrás, así
+  que cualquier `fetch` a él falla con `TypeError: NetworkError when attempting to
+  fetch resource`. No bloquea el lobby realtime ni la partida (todo va por
+  Supabase), pero cualquier reintento de auth falla en silencio. Si en F3 se
+  quiere login real o perfiles, hay que separar la base de la API de `DOMAIN` o
+  servirla en el mismo origen.
 - **Sin `service_role`**: cualquier operación que necesite privilegios de Supabase
   tiene que resolverse con RLS y la clave publishable.
 

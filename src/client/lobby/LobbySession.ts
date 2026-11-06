@@ -217,9 +217,6 @@ export class LobbySession {
       hostID: this.clientID,
     };
     LobbyStartSchema.parse(start);
-    console.log(
-      `[DEBUG-HANDOFF] Sending LobbyStart room=${start.roomCode} gameID=${start.gameID} hostID=${start.hostID} players=${start.gameStartInfo.players.map((p) => p.clientID).join(",")}`,
-    );
     try {
       await this.publish({
         type: "heartbeat",
@@ -401,9 +398,6 @@ export class LobbySession {
   }
 
   private receiveStart(start: LobbyStart): void {
-    console.log(
-      `[DEBUG-HANDOFF] Received LobbyStart room=${start.roomCode} gameID=${start.gameID} hostID=${start.hostID} myHostID=${this.hostID} isHost=${this.isHost} closed=${this.closed} phase=${this.phase}`,
-    );
     if (
       this.isHost ||
       this.closed ||

@@ -461,9 +461,6 @@ export class Transport {
     this.onconnect = onconnect;
     this.onmessage = onmessage;
     if (this.realtimeSession !== null) {
-      console.log(
-        `[DEBUG-HANDOFF] Transport connecting realtime gameID=${this.lobbyConfig.gameID} clientID=${this.lobbyConfig.realtime?.clientID} hostID=${this.lobbyConfig.realtime?.hostID}`,
-      );
       void this.realtimeSession
         .connect(onconnect, (message) => this.onmessage(message))
         .catch((error) => {

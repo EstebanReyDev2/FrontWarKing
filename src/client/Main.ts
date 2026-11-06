@@ -1439,9 +1439,6 @@ class Client {
     event: LaunchRealtimeGameEvent,
   ): Promise<void> {
     const { start, clientID, nickname } = event;
-    console.log(
-      `[DEBUG-HANDOFF] Main handler triggered gameID=${start.gameID} clientID=${clientID} nickname=${nickname} hostID=${start.hostID} players=${start.gameStartInfo.players.length}`,
-    );
     if (this.lobbyHandle !== null) {
       this.lobbyHandle.stop(true);
       this.lobbyHandle = null;
@@ -1460,9 +1457,6 @@ class Client {
 
     const { joinLobby } = await loadGameClient();
     if (this.mostRecentJoinEvent !== joinToken) return;
-    console.log(
-      `[DEBUG-HANDOFF] Calling joinLobby gameID=${start.gameID} clientID=${clientID} hostID=${start.hostID}`,
-    );
     const newLobbyHandle = joinLobby(this.eventBus, {
       gameID: start.gameID,
       cosmetics: {},
