@@ -11,6 +11,18 @@ const JOIN = {
 };
 
 describe("ClientJoinMessageSchema — spectator", () => {
+  it("requires an explicit clanTag key, which may be null", () => {
+    expect(
+      ClientJoinMessageSchema.safeParse({ ...JOIN, clanTag: null }).success,
+    ).toBe(true);
+
+    const withoutClanTag = { ...JOIN } as Partial<typeof JOIN>;
+    delete withoutClanTag.clanTag;
+    expect(ClientJoinMessageSchema.safeParse(withoutClanTag).success).toBe(
+      false,
+    );
+  });
+
   it("accepts a spectator join", () => {
     const parsed = ClientJoinMessageSchema.parse({ ...JOIN, spectator: true });
     expect(parsed.spectator).toBe(true);

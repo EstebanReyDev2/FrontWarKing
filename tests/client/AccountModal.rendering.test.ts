@@ -1,7 +1,7 @@
 import type { UserMeResponse } from "@openfront/shared/ApiSchemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── Mocks (mirrors tests/client/clan/ClanModalTestUtils.ts factories) ──────
+// ─── Mocks ───────────────────────────────────────────────────────────────
 
 vi.mock("../../src/client/Api", () => ({
   getUserMe: vi.fn(async () => false as const),
@@ -46,7 +46,6 @@ vi.mock("../../src/client/CrazyGamesSDK", () => ({
 
 vi.mock("../../src/client/Cosmetics", () => ({
   fetchCosmetics: vi.fn(async () => null),
-  translateCosmetic: vi.fn((v: unknown) => v),
 }));
 
 vi.stubGlobal("localStorage", {
@@ -75,7 +74,6 @@ function makeUserMe(
       achievements: { singleplayerMap: [], player: [] },
       friends: [],
       subscription: null,
-      currency: { soft: 100, hard: 10 },
     },
   };
 }
@@ -100,9 +98,8 @@ describe("AccountModal — rendering", () => {
   });
 
   // Directly install a resolved userMeResponse and flip off the loading state,
-  // bypassing onOpen()'s network calls — this mirrors ClanModalTestUtils'
-  // setState() helper, but userMeResponse is a plain private field (not a Lit
-  // @state), so we force a render manually afterward.
+  // bypassing onOpen()'s network calls. userMeResponse is a plain private field
+  // (not a Lit @state), so we force a render manually afterward.
   async function setLoggedInUser(userMe: UserMeResponse): Promise<void> {
     (
       modal as unknown as { userMeResponse: UserMeResponse | null }
@@ -142,9 +139,7 @@ describe("AccountModal — rendering", () => {
     // No Google-link CTA either — Steam is primary in v1, no linking UI.
     expect(text).not.toContain("account_modal.link_google");
 
-    // Currency IS rendered for the Steam branch of renderLoggedInAs(); logging
-    // out moved to the nav profile menu, so no log-out control here.
-    expect(modal.querySelector("currency-display")).toBeTruthy();
+    // Logging out moved to the nav profile menu, so no log-out control here.
     expect(text).not.toContain("nav_account_menu.log_out");
   });
 
@@ -176,8 +171,6 @@ describe("AccountModal — rendering", () => {
     // The linking CTA a Steam-primary user does NOT get.
     expect(text).toContain("account_modal.link_google");
 
-    // Still a logged-in view, not the login-options screen.
-    expect(modal.querySelector("currency-display")).toBeTruthy();
     // Logging out lives in the nav profile menu now.
     expect(text).not.toContain("nav_account_menu.log_out");
   });

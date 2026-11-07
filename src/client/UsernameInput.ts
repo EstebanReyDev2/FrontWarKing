@@ -1,10 +1,8 @@
 import { UserMeResponse } from "@openfront/shared/ApiSchemas";
-import { sanitizeClanTag } from "@openfront/shared/SharedUtil";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { translateText } from "../client/Utils";
-import { getUserMe, invalidateUserMe } from "./Api";
-import { checkClanTagOwnership } from "./ClanApi";
+import { getUserMe } from "./Api";
 import { verifiedBadge } from "./components/ui/VerifiedBadge";
 import { gamePortal } from "./GamePortal";
 import { showInGameAlert, showInGameConfirm } from "./InGameModal";
@@ -22,19 +20,11 @@ import {
   type ClaimGrace,
   type ResolvedPlayerName,
 } from "./PlayerName";
-import {
-  parseSteamGrantStore,
-  STEAM_GRANT_NOTICE_KEY,
-  steamGrantEnded,
-  steamGrantEndedShown,
-} from "./SteamGrantNotices";
+import { isPixelDevRoute, isPreviewRoute } from "./RouteMode";
 import { steamSDK } from "./SteamSDK";
 import {
-  MAX_CLAN_TAG_LENGTH,
   MAX_USERNAME_LENGTH,
-  MIN_CLAN_TAG_LENGTH,
   MIN_USERNAME_LENGTH,
-  validateClanTag,
   validateUsername,
 } from "./validations/username";
 
@@ -45,7 +35,6 @@ interface LangSelectorLike {
 }
 
 const usernameKey: string = "username";
-const clanTagKey: string = "clanTag";
 const useVerifiedNameKey: string = "useVerifiedName";
 // "The stored username is one we generated, not one the player chose." Written
 // alongside the name itself; see usernameIsGenerated.
@@ -62,11 +51,6 @@ const lapseNoticeKey: string = LAPSE_NOTICE_KEY;
 // setTimeout stores its delay in a 32-bit signed int. Anything larger does not
 // saturate — Node warns and fires after 1ms.
 const MAX_TIMEOUT_MS = 2_147_483_647;
-
-// Announced by the clan modal, which invalidates /users/@me but dispatches no
-// fresh userMeResponse.
-const CLAN_REMOVED_EVENTS = ["clan-left", "clan-disbanded"];
-const CLAN_MEMBERSHIP_EVENTS = ["clan-joined", ...CLAN_REMOVED_EVENTS];
 
 // Decide, once per profile, whether the verified-name default is allowed to
 // apply here — and record it, because the evidence is destroyed moments later.
@@ -105,7 +89,7 @@ function resolveVerifiedDefaultCohort(onGamePortal: boolean): void {
 
 // Same format the account modal's grace warning uses, so the two places that
 // name this deadline read alike. Local rather than shared: every component in
-// this codebase that shows a date formats its own (FriendsList, TribesPanel,
+// this codebase that shows a date formats its own (e.g. SubscriptionPanel,
 // SubscriptionPanel, UsernamePanel).
 function formatClaimDate(date: Date): string {
   return date.toLocaleDateString(undefined, {
@@ -129,7 +113,6 @@ const NAME_TEXT =
 @customElement("username-input")
 export class UsernameInput extends LitElement {
   @state() private baseUsername: string = "";
-  @state() private clanTag: string = "";
   // Playing under the account's verified bare name (sub-only). The free-form
   // name stays in baseUsername/localStorage so unchecking restores it.
   @state() private verifiedActive: boolean = false;
@@ -153,33 +136,15 @@ export class UsernameInput extends LitElement {
   // never receives.
   private claimGraceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Clans aren't supported on portals — hide the tag input and never submit one.
+  // Portal identities are account-owned, so never persist their names locally.
   private readonly onGamePortal = gamePortal.isOnGamePortal();
   // Steam identity is fixed for the session (no login/logout events like
   // the portals), so it's only used to seed the name once in connectedCallback.
   private readonly onSteam = steamSDK.isOnSteam();
 
   @property({ type: String }) validationError: string = "";
-  // Ownership-check feedback (i18n key) shown inline beneath the tag input. Only
-  // "not a member" gates the buttons (see emitValidity); the rest is advisory.
-  @state() private clanTagOwnershipError: string = "";
-  @state() private clanCheckPending: boolean = false;
-  @state() private clanMenuOpen: boolean = false;
-  // What the picker's free-text field shows. Separate from clanTag so it can
-  // stay empty while a listed clan is selected (see toggleClanMenu).
-  @state() private clanDraft: string = "";
   private _isValid: boolean = true;
   private _lastValidatedLang: string | null = null;
-
-  // Latest in-flight ownership check. `clanCheckGen` discards stale results so
-  // only the most recent keystroke updates the UI / resolves the submit value.
-  private clanCheckGen = 0;
-  private clanCheck: Promise<string | null> = Promise.resolve(null);
-
-  // Same guard for the profile: an uncached picker refresh and a clan-event
-  // refresh can overlap, and the older one settling last would reinstate the
-  // membership the newer one just corrected.
-  private userMeGen = 0;
 
   // Resolves once the one-shot Steam name-seed has settled (or immediately for
   // non-Steam players). The join flow awaits this before reading getUsername()
@@ -208,111 +173,6 @@ export class UsernameInput extends LitElement {
       this.applyVerifiedPreference();
     });
   }
-
-  // The clans this player belongs to, for the tag picker. Empty when signed
-  // out or when an older API omits the field.
-  private myClans(): { tag: string; name: string }[] {
-    if (this.userMe === null || this.userMe === false) return [];
-    return this.userMe.player.clans ?? [];
-  }
-
-  // Without this the picker keeps listing whatever clans the player had at
-  // page load.
-  private handleClanMembershipChange = (e: Event) => {
-    const tag = (e as CustomEvent<{ tag?: string }>).detail?.tag;
-    // Same as a server-side rejection (see Matchmaking). Disbanding counts.
-    if (CLAN_REMOVED_EVENTS.includes(e.type) && tag) this.clearClanTag(tag);
-    // The clan flows invalidate the cache before announcing.
-    this.refreshMembership();
-  };
-
-  private refreshMembership(opts: { fresh?: boolean } = {}) {
-    void this.refreshUserMe(opts).then((refreshed) => {
-      // Only worth re-running against membership we actually have. The check
-      // reads getUserMe itself, so after an inconclusive refresh it sees the
-      // cached false, takes the player for a member of nothing, and reports
-      // their own clan as "not a member" — disabling play until some later
-      // invalidation happens to succeed.
-      //
-      // Re-run when it is conclusive: the "not a member" error links into the
-      // clan modal, so joining is the usual way out of it, and both the error
-      // and clanCheck stick until the check runs again.
-      if (refreshed && this.clanTag) this.startClanCheck();
-    });
-  }
-
-  private refreshUserMe(opts: { fresh?: boolean } = {}): Promise<boolean> {
-    // Membership also changes server-side (kicked, or a request approved)
-    // without invalidating this tab's cache, so a plain refresh would re-read
-    // the page-load snapshot.
-    if (opts.fresh) invalidateUserMe();
-    const gen = ++this.userMeGen;
-    return getUserMe().then((me) => {
-      // Superseded: a newer refresh is in flight and will do this itself.
-      if (gen !== this.userMeGen) return false;
-      // `false` here is a transient failure — a network error or non-200,
-      // cached either way — so keep the snapshot rather than silently
-      // dropping the player to their free-form name. An expired session is
-      // not this: clearing the session announces itself (see Auth).
-      if (me === false) return false;
-      this.userMe = me;
-      this.applyVerifiedPreference();
-      return true;
-    });
-  }
-
-  private toggleClanMenu = () => {
-    this.clanMenuOpen = !this.clanMenuOpen;
-    if (this.clanMenuOpen) {
-      this.refreshMembership({ fresh: true });
-      // Tracked separately from clanTag so typing a tag that matches a listed
-      // clan doesn't blank the field mid-keystroke.
-      const active = this.clanTag.toUpperCase();
-      this.clanDraft = this.myClans().some(
-        (c) => c.tag.toUpperCase() === active,
-      )
-        ? ""
-        : this.clanTag;
-    }
-  };
-
-  // Bound for the element's lifetime rather than with the menu, so no stray
-  // listener can outlive it.
-  private handleDocumentPointerDown = (e: Event) => {
-    if (!this.clanMenuOpen) return;
-    if (e.composedPath().includes(this)) return;
-    this.clanMenuOpen = false;
-  };
-
-  private handleClanMenuKeydown(e: KeyboardEvent) {
-    if (e.key !== "Escape") return;
-    this.clanMenuOpen = false;
-    this.querySelector<HTMLElement>("#clan-tag-button")?.focus();
-  }
-
-  // API tags are already valid, so no sanitising — but the ownership check
-  // still runs, keeping getClanCheck() authoritative.
-  private selectClan(tag: string | null) {
-    this.clanTag = tag ?? "";
-    this.clanDraft = "";
-    this.clanMenuOpen = false;
-    this.validateAndStore();
-    this.startClanCheck();
-  }
-
-  // "Browse clans" has to name the tab explicitly: showPage alone opens the
-  // modal on its default my-clans tab, which is not what the label promises.
-  private openClanBrowser = () => {
-    this.clanMenuOpen = false;
-    window.showPage?.("page-clan");
-    void customElements.whenDefined("clan-modal").then(() => {
-      document
-        .querySelector<HTMLElement & { open: (args: { tab: string }) => void }>(
-          "clan-modal",
-        )
-        ?.open({ tab: "browse" });
-    });
-  };
 
   // The bare name this player may play verified under, or null when
   // ineligible. The rule itself lives in PlayerName so the join path and the
@@ -413,30 +273,9 @@ export class UsernameInput extends LitElement {
     // side think a notice is pending while the other thinks it is spent.
     const marker = lapseNoticeMarker(grace);
     if (localStorage.getItem(lapseNoticeKey) === marker) return;
-    // A former Steam grant holder never subscribed, so "your subscription
-    // ended... resubscribe" is the sentence that convinces them the game hid
-    // one. This notice is the first thing they see after the month ends, so
-    // it carries the sign-off and marks it shown below, or the boot sequencer
-    // would say it all again next launch. An admin comp or Discord-role grant
-    // with an end date never subscribed either: it gets the same shape
-    // without naming Steam or who granted it.
-    const endedGrant = steamGrantEnded(
-      parseSteamGrantStore(localStorage.getItem(STEAM_GRANT_NOTICE_KEY)),
-      this.userMe,
-      Date.now(),
-    );
-    const afterGrant = endedGrant !== null;
-    const key = !afterGrant
-      ? grace.atRisk
-        ? "username.lapse_notice_at_risk"
-        : "username.lapse_notice"
-      : endedGrant.steam
-        ? grace.atRisk
-          ? "username.lapse_notice_after_grant_at_risk"
-          : "username.lapse_notice_after_grant"
-        : grace.atRisk
-          ? "username.lapse_notice_after_free_access_at_risk"
-          : "username.lapse_notice_after_free_access";
+    const key = grace.atRisk
+      ? "username.lapse_notice_at_risk"
+      : "username.lapse_notice";
     const message = translateText(key, {
       name: grace.name,
       date: formatClaimDate(grace.expiresAt),
@@ -458,17 +297,6 @@ export class UsernameInput extends LitElement {
     // player dismisses it, and an unawaited promise that never settles would
     // let a second announcement through.
     localStorage.setItem(lapseNoticeKey, marker);
-    if (afterGrant && this.userMe !== null && this.userMe !== false) {
-      localStorage.setItem(
-        STEAM_GRANT_NOTICE_KEY,
-        JSON.stringify(
-          steamGrantEndedShown(
-            parseSteamGrantStore(localStorage.getItem(STEAM_GRANT_NOTICE_KEY)),
-            this.userMe.player.publicId,
-          ),
-        ),
-      );
-    }
     void showInGameAlert(message);
   }
 
@@ -507,17 +335,9 @@ export class UsernameInput extends LitElement {
       window.location.hash = "modal=change-username";
       return;
     }
-    const goStore = await showInGameConfirm(
-      translateText("username.verified_sub_required"),
-      {
-        heading: translateText("username.verified_heading"),
-        variant: "warning",
-        confirmText: translateText("username.verified_sub_required_confirm"),
-      },
-    );
-    if (goStore) {
-      window.location.hash = "modal=store&tab=subscriptions";
-    }
+    await showInGameAlert(translateText("username.verified_sub_required"), {
+      heading: translateText("username.verified_heading"),
+    });
   }
 
   /**
@@ -547,36 +367,6 @@ export class UsernameInput extends LitElement {
     return this.resolvedName().verified;
   }
 
-  public getClanTag(): string | null {
-    return this.clanTag.length >= MIN_CLAN_TAG_LENGTH &&
-      this.clanTag.length <= MAX_CLAN_TAG_LENGTH &&
-      validateClanTag(this.clanTag).isValid
-      ? this.clanTag
-      : null;
-  }
-
-  public clearClanTag(expectedTag?: string): void {
-    if (
-      expectedTag !== undefined &&
-      this.clanTag.toUpperCase() !== expectedTag.toUpperCase()
-    ) {
-      return;
-    }
-    this.clanTag = "";
-    this.clanDraft = "";
-    this.clanTagOwnershipError = "";
-    this.validateAndStore();
-    this.startClanCheck();
-    this.requestUpdate();
-  }
-
-  // Resolves to the clan tag to actually submit (null when it should be
-  // dropped). The join flow awaits this so the ownership check — kicked off on
-  // input — can run in parallel with the WebSocket handshake.
-  public getClanCheck(): Promise<string | null> {
-    return this.clanCheck;
-  }
-
   // Resolves once the one-shot Steam name-seed has settled (immediately for
   // non-Steam players, or once nothing was left to seed). The join flow awaits
   // this before reading getUsername() so a fast join reads the Steam persona
@@ -586,45 +376,9 @@ export class UsernameInput extends LitElement {
     return this.steamSeedReady;
   }
 
-  private startClanCheck() {
-    const gen = ++this.clanCheckGen;
-    const tag = this.clanTag;
-    this.clanTagOwnershipError = "";
-    this.emitValidity();
-    if (tag.length === 0 || !validateClanTag(tag).isValid) {
-      this.clanCheckPending = false;
-      this.clanCheck = Promise.resolve(null);
-      return;
-    }
-    // Membership already in hand answers this. checkClanTagOwnership would
-    // otherwise re-read getUserMe, which after a failed refresh holds a cached
-    // false — it would take the player for a member of nothing and reject the
-    // very clan they just picked from their own list. The server re-checks the
-    // tag at join either way (see Matchmaking).
-    if (this.myClans().some((c) => c.tag.toUpperCase() === tag.toUpperCase())) {
-      this.clanCheckPending = false;
-      this.clanCheck = Promise.resolve(tag);
-      return;
-    }
-    this.clanCheckPending = true;
-    this.clanCheck = checkClanTagOwnership(tag).then((res) => {
-      if (gen === this.clanCheckGen) {
-        this.clanTagOwnershipError = res.error ?? "";
-        this.clanCheckPending = false;
-        this.emitValidity();
-      }
-      return res.tag;
-    });
-  }
-
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener("pointerdown", this.handleDocumentPointerDown, {
-      capture: true,
-    });
-    for (const type of CLAN_MEMBERSHIP_EVENTS) {
-      document.addEventListener(type, this.handleClanMembershipChange);
-    }
+    if (isPreviewRoute() || isPixelDevRoute()) return;
     // Refresh unconditionally, before the fetch below can short-circuit.
     // disconnectedCallback clears the timer but leaves userMe set, so a
     // detach/reattach of the same instance takes the `userMe !== null` early
@@ -720,17 +474,6 @@ export class UsernameInput extends LitElement {
   }
 
   disconnectedCallback() {
-    document.removeEventListener(
-      "pointerdown",
-      this.handleDocumentPointerDown,
-      {
-        capture: true,
-      },
-    );
-    for (const type of CLAN_MEMBERSHIP_EVENTS) {
-      document.removeEventListener(type, this.handleClanMembershipChange);
-    }
-    this.clanMenuOpen = false;
     if (this.claimGraceTimer !== null) {
       clearTimeout(this.claimGraceTimer);
       this.claimGraceTimer = null;
@@ -762,9 +505,6 @@ export class UsernameInput extends LitElement {
     const storedUsername = this.onGamePortal
       ? null
       : localStorage.getItem(usernameKey);
-    if (storedUsername) {
-      this.clanTag = localStorage.getItem(clanTagKey) ?? "";
-    }
     // No persona yet — it arrives asynchronously and reseeds in
     // connectedCallback, so this settles on the stored or generated name.
     const resolved = resolvePlayerName({
@@ -779,7 +519,6 @@ export class UsernameInput extends LitElement {
       ? this.storedNameIsGenerated()
       : resolved.source === "generated";
     this.validateAndStore();
-    if (storedUsername) this.startClanCheck();
   }
 
   // Whether the name already in localStorage is one we generated.
@@ -798,17 +537,15 @@ export class UsernameInput extends LitElement {
 
   render() {
     return html`
-      <!-- The name field takes whatever the tag picker and trailing button
-           leave, so the row always fills the strip. -->
       <div class="flex items-center w-full h-full gap-1.5 sm:gap-2">
-        ${this.renderClanControl()} ${this.renderNameControl()}
+        ${this.renderNameControl()}
       </div>
       <!-- One positioned slot, stacked. An error and the reservation reminder
            are not alternatives: the error is transient and self-inflicted
            (mid-edit on a free-form name), while the reminder is a 30-day
            countdown the player cannot recover once it lapses. Hiding the
            second behind the first put the time-critical one last. -->
-      ${this.validationError || this.clanTagOwnershipError || this.claimGrace
+      ${this.validationError || this.claimGrace
         ? html`<div
             class="absolute top-full left-0 z-50 w-full mt-1 flex flex-col gap-1"
           >
@@ -819,9 +556,7 @@ export class UsernameInput extends LitElement {
                 >
                   ${this.validationError}
                 </div>`
-              : this.clanTagOwnershipError
-                ? this.renderClanTagOwnershipError()
-                : null}
+              : null}
             ${this.renderClaimGrace()}
           </div>`
         : null}
@@ -849,167 +584,6 @@ export class UsernameInput extends LitElement {
         { name: grace.name, date: formatClaimDate(grace.expiresAt) },
       )}
     </div>`;
-  }
-
-  // Members pick from their own clans rather than guessing a tag and waiting
-  // to be rejected; the free-text field covers everyone else.
-  private renderClanControl() {
-    const tag = this.clanTag;
-    const invalid = this.clanTagOwnershipError !== "";
-    return html`
-      <!-- Escape is bound here, not on the menu: the trigger keeps focus and
-           is the menu's sibling, so a menu-level handler never sees it. -->
-      <div
-        class="no-game-portal relative shrink-0 h-full max-h-[44px]"
-        @keydown=${this.handleClanMenuKeydown}
-      >
-        <button
-          type="button"
-          id="clan-tag-button"
-          class="flex h-full w-[7.25rem] items-center justify-between gap-0.5 rounded-lg bg-transparent px-1.5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-malibu-blue/60 ${invalid
-            ? "ring-2 ring-red-400/70"
-            : this.clanMenuOpen
-              ? "bg-white/10"
-              : "hover:bg-white/5"}"
-          aria-haspopup="dialog"
-          aria-expanded=${this.clanMenuOpen ? "true" : "false"}
-          aria-busy=${this.clanCheckPending ? "true" : "false"}
-          aria-invalid=${invalid ? "true" : "false"}
-          aria-label=${translateText("username.clan_label")}
-          title=${translateText("username.clan_label")}
-          @click=${this.toggleClanMenu}
-        >
-          <span
-            class="min-w-0 flex-1 truncate text-base font-semibold uppercase text-left ${tag
-              ? "text-white"
-              : "text-white/45"}"
-            >${tag || translateText("username.tag")}</span
-          >
-          ${this.clanCheckPending
-            ? html`<span
-                class="w-3 h-3 shrink-0 border-2 border-white/30 border-t-white/80 rounded-full animate-spin"
-                aria-hidden="true"
-              ></span>`
-            : html`<svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-3 h-3 shrink-0 text-white/45"
-                aria-hidden="true"
-              >
-                <path
-                  d="M5.5 7.5 10 12l4.5-4.5"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="none"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                ></path>
-              </svg>`}
-        </button>
-        ${this.clanMenuOpen ? this.renderClanMenu() : null}
-      </div>
-    `;
-  }
-
-  private renderClanMenu() {
-    const clans = this.myClans();
-    const active = this.clanTag.toUpperCase();
-    return html`
-      <div
-        id="clan-tag-menu"
-        role="dialog"
-        aria-labelledby="clan-tag-button"
-        class="absolute left-0 top-full z-50 mt-1.5 w-[17rem] max-w-[80vw] rounded-xl border border-white/15 bg-surface/95 p-1.5 shadow-xl backdrop-blur-md"
-      >
-        ${clans.length > 0
-          ? html`
-              <div
-                class="px-2 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-white/40"
-              >
-                ${translateText("username.clan_your_clans")}
-              </div>
-              <div class="max-h-56 overflow-y-auto">
-                ${clans.map(
-                  (clan) => html`
-                    <button
-                      type="button"
-                      class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors cursor-pointer ${clan.tag.toUpperCase() ===
-                      active
-                        ? "bg-malibu-blue/25"
-                        : "hover:bg-white/10"}"
-                      @click=${() => this.selectClan(clan.tag)}
-                    >
-                      <span
-                        class="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-sm font-bold uppercase tracking-wider text-white"
-                        >${clan.tag}</span
-                      >
-                      <span
-                        class="min-w-0 flex-1 truncate text-sm text-white/80"
-                        >${clan.name}</span
-                      >
-                      ${clan.tag.toUpperCase() === active
-                        ? html`<svg
-                            viewBox="0 0 24 24"
-                            class="w-4 h-4 shrink-0 text-malibu-blue"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M5 12.5l4.5 4.5L19 7"
-                              stroke="currentColor"
-                              stroke-width="2.5"
-                              fill="none"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                            ></path>
-                          </svg>`
-                        : null}
-                    </button>
-                  `,
-                )}
-              </div>
-            `
-          : html`<div class="px-2 pt-1.5 pb-1 text-sm text-white/50">
-              ${translateText("username.clan_none_joined")}
-            </div>`}
-        <div class="mt-1.5 border-t border-white/10 pt-1.5">
-          <label
-            class="block px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-white/40"
-            for="clan-tag-manual"
-            >${translateText("username.clan_custom")}</label
-          >
-          <input
-            id="clan-tag-manual"
-            type="text"
-            .value=${this.clanDraft}
-            @input=${this.handleClanTagChange}
-            placeholder=${translateText("username.tag")}
-            minlength="${MIN_CLAN_TAG_LENGTH}"
-            maxlength="${MAX_CLAN_TAG_LENGTH}"
-            class="w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-base font-semibold uppercase tracking-wider text-white placeholder-white/30 focus:border-malibu-blue/60 focus:outline-none"
-          />
-        </div>
-        <div
-          class="mt-1.5 flex items-center gap-2 border-t border-white/10 pt-1.5"
-        >
-          ${this.clanTag
-            ? html`<button
-                type="button"
-                class="rounded-lg px-2 py-1 text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                @click=${() => this.selectClan(null)}
-              >
-                ${translateText("username.clan_clear")}
-              </button>`
-            : null}
-          <button
-            type="button"
-            class="ml-auto rounded-lg px-2 py-1 text-sm text-malibu-blue hover:bg-malibu-blue/15 transition-colors cursor-pointer"
-            @click=${this.openClanBrowser}
-          >
-            ${translateText("username.clan_browse")}
-          </button>
-        </div>
-      </div>
-    `;
   }
 
   // Name field. Verified play swaps the free-text input for a badge-led chip so
@@ -1126,68 +700,6 @@ export class UsernameInput extends LitElement {
     `;
   }
 
-  private renderClanTagOwnershipError() {
-    const content = translateText(this.clanTagOwnershipError, {
-      tag: this.clanTag,
-    });
-    const className =
-      "self-start px-3 py-2 text-sm font-medium border border-red-500/50 rounded-lg bg-red-900/90 text-red-200 backdrop-blur-md shadow-lg lg:whitespace-nowrap";
-
-    if (this.clanTagOwnershipError !== "username.tag_not_member") {
-      return html`<div id="clan-tag-validation-error" class=${className}>
-        ${content}
-      </div>`;
-    }
-
-    const tag = this.clanTag;
-    return html`<button
-      id="clan-tag-validation-error"
-      type="button"
-      class="${className} underline decoration-red-200/50 underline-offset-2 hover:bg-red-800/90 focus:outline-none focus:ring-2 focus:ring-red-200/70"
-      @click=${() => this.openClanJoinModal(tag)}
-    >
-      ${content}
-    </button>`;
-  }
-
-  private openClanJoinModal(tag: string) {
-    window.showPage?.("page-clan");
-    void customElements.whenDefined("clan-modal").then(() => {
-      document
-        .querySelector<HTMLElement & { open: (args: { tag: string }) => void }>(
-          "clan-modal",
-        )
-        ?.open({ tag });
-    });
-  }
-
-  private handleClanTagChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const originalValue = input.value;
-    const val = sanitizeClanTag(originalValue);
-    // Only show toast if characters were actually removed (not just uppercased)
-    if (originalValue.toUpperCase() !== val) {
-      input.value = val;
-      // Show toast when invalid characters are removed
-      window.dispatchEvent(
-        new CustomEvent("show-message", {
-          detail: {
-            message: translateText("username.tag_invalid_chars"),
-            color: "red",
-            duration: 2000,
-          },
-        }),
-      );
-    } else if (originalValue !== val) {
-      // Just update the input without toast if only case changed
-      input.value = val;
-    }
-    this.clanTag = val;
-    this.clanDraft = val;
-    this.validateAndStore();
-    this.startClanCheck();
-  }
-
   private handleUsernameChange(e: Event) {
     const input = e.target as HTMLInputElement;
     const originalValue = input.value;
@@ -1217,23 +729,12 @@ export class UsernameInput extends LitElement {
     // must stay blocked until the player puts a name back.
     const trimmedBase = this.baseUsername.trim();
 
-    const clanTagResult = validateClanTag(this.clanTag);
-    if (!clanTagResult.isValid) {
-      this._isValid = false;
-      this.validationError = clanTagResult.error ?? "";
-      this.emitValidity();
-      return;
-    }
-
     // Playing under the verified account name: it's server-issued, so skip
     // free-form validation and leave the stored free-form name untouched for
     // when the toggle turns off.
     if (this.verifiedActive) {
       this._isValid = true;
       this.validationError = "";
-      if (!this.onGamePortal) {
-        localStorage.setItem(clanTagKey, this.getClanTag() ?? "");
-      }
       this.emitValidity();
       return;
     }
@@ -1251,7 +752,6 @@ export class UsernameInput extends LitElement {
           usernameIsGeneratedKey,
           String(this.usernameIsGenerated),
         );
-        localStorage.setItem(clanTagKey, this.getClanTag() ?? "");
       }
       this.validationError = "";
     } else {
@@ -1269,10 +769,8 @@ export class UsernameInput extends LitElement {
     );
   }
 
-  // Play-eligibility: syntax-valid and not blocked by clan membership.
+  // Play-eligibility: syntax-valid.
   public canPlay(): boolean {
-    return (
-      this._isValid && this.clanTagOwnershipError !== "username.tag_not_member"
-    );
+    return this._isValid;
   }
 }

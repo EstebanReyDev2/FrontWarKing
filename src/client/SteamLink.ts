@@ -360,7 +360,7 @@ export type RedeemSteamLinkResult =
 //   200 -> ok
 //   401 -> stale cached JWT; clears it via logOut() before failing, matching
 //          the convention every other authenticated call in Api.ts follows
-//          (e.g. setMarketingConsent, updateUsername, getMyTribeNames).
+//          (e.g. setMarketingConsent, updateUsername).
 //   409 -> refused; `reason` is the server's machine-readable code verbatim
 //          (e.g. "steam_has_progress") so the UI can render a specific
 //          message. Never mapped to a generic failure or reworded.

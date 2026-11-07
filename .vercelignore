@@ -1,0 +1,30 @@
+# Vercel builds the client bundle and rewrites `static/index.html` in place,
+# so the previous output is never an input.
+static/
+
+# Not read by the build command, vite or tsc.
+tests/
+docs/
+.github/
+.husky/
+.vscode/
+.claude/
+captures/
+map-generator/
+__mocks__/
+
+# Local-only container and reverse-proxy tooling.
+Dockerfile
+nginx.conf
+supervisord.conf
+build.sh
+build-deploy.sh
+deploy.sh
+setup.sh
+update.sh
+generate-nginx-upstream.sh
+
+# Local env files. The build reads Vercel project env vars, not these.
+.env.local
+.env.*.local
+.env

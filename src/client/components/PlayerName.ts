@@ -7,8 +7,8 @@ import { usernameText } from "./ui/UsernameText";
 import { verifiedBadge } from "./ui/VerifiedBadge";
 
 /**
- * Standard rendering of a player identity on account surfaces (friends, clan
- * lists, leaderboards, profiles): the account username when set — with the
+ * Standard rendering of a player identity on account surfaces (clan lists,
+ * leaderboards, profiles): the account username when set — with the
  * verified check when it's a bare-name claim (isVerifiedUsername) — falling
  * back to the publicId. Clicking copies the account username when set, the
  * publicId otherwise. `copyText` overrides the copy payload entirely (e.g. a

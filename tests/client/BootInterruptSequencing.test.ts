@@ -50,9 +50,9 @@ import {
 import { LAPSE_NOTICE_KEY } from "../../src/client/PlayerName";
 import { UsernameInput } from "../../src/client/UsernameInput";
 
-// Lapsed, still inside the grace window, and holding unclaimed rewards — the
-// pair that collides.
-function lapsedWithRewards(): UserMeResponse {
+// Lapsed, still inside the grace window — the notice that collides with the
+// rest of the boot.
+function lapsedPlayer(): UserMeResponse {
   return {
     user: { email: "player@example.com" },
     player: {
@@ -62,7 +62,6 @@ function lapsedWithRewards(): UserMeResponse {
       username: "RyanTheGreat",
       usernameClaimExpiresAt: "2099-01-01T00:00:00.000Z",
       nextUsernameChangeAt: null,
-      rewards: [{ id: "r1" }],
     },
   } as unknown as UserMeResponse;
 }
@@ -90,17 +89,13 @@ describe("boot sequencing against a real <username-input>", () => {
     );
     await el.updateComplete;
 
-    const calls = { navigated: [] as string[], rewardsOpened: 0 };
+    const calls = { navigated: [] as string[] };
     const ports: BootInterruptPorts = {
       translate: (key) => `t(${key})`,
       confirm: async () => false,
       alert: async () => {},
-      tierName: (tier) => tier,
       navigate: (hash) => calls.navigated.push(hash),
-      openRewards: () => calls.rewardsOpened++,
       storeClaimPrompt: () => {},
-      updateSteamGrant: () => {},
-      markNoticeSeen: () => {},
       now: () => Date.now(),
     };
     const player = userMe.player;
@@ -110,18 +105,10 @@ describe("boot sequencing against a real <username-input>", () => {
       username: player.username,
       usernameBase: player.usernameBase,
       lapseNoticeDue: shown,
-      grantWelcomeDue: false,
-      grantEndedDue: false,
-      grantStringsReady: true,
-      rewardCount: (player.rewards ?? []).length,
       claimPromptDue: true,
       claimStringsReady: true,
     });
-    await runBootInterrupt(
-      interrupt,
-      { claimStore: {}, grantStore: {}, publicId: "p" },
-      ports,
-    );
+    await runBootInterrupt(interrupt, { claimStore: {}, publicId: "p" }, ports);
     return { interrupt, ...calls };
   }
 
@@ -153,32 +140,28 @@ describe("boot sequencing against a real <username-input>", () => {
   });
 
   it("stands aside for a lapse notice that actually spoke", async () => {
-    const result = await boot(lapsedWithRewards());
+    const result = await boot(lapsedPlayer());
     expect(showInGameAlert).toHaveBeenCalledTimes(1);
     expect(result.interrupt).toBe("lapse-notice");
-    // The whole point of naming it in the ordering: nothing else opens on top.
-    expect(result.rewardsOpened).toBe(0);
   });
 
   // The same bail, for the other reason announceLapse has: translateText
   // echoes the key back until the language files land, and announcing the
   // literal string "username.lapse_notice" would burn the one-shot marker.
-  it("falls through to rewards when the strings have not landed", async () => {
+  it("stays quiet when the strings have not landed", async () => {
     translations.loaded = false;
-    const result = await boot(lapsedWithRewards());
+    const result = await boot(lapsedPlayer());
     expect(showInGameAlert).not.toHaveBeenCalled();
-    expect(result.interrupt).toBe("rewards");
-    expect(result.rewardsOpened).toBe(1);
+    expect(result.interrupt).toBeNull();
   });
 
   // Second boot: the marker is already stored, so nothing is owed and nothing
-  // was written this time either. Rewards gets its turn.
-  it("gives rewards the next boot, once the notice has been said", async () => {
-    await boot(lapsedWithRewards());
+  // was written this time either.
+  it("stays quiet once the notice has been said", async () => {
+    await boot(lapsedPlayer());
     showInGameAlert.mockClear();
-    const result = await boot(lapsedWithRewards());
+    const result = await boot(lapsedPlayer());
     expect(showInGameAlert).not.toHaveBeenCalled();
-    expect(result.interrupt).toBe("rewards");
-    expect(result.rewardsOpened).toBe(1);
+    expect(result.interrupt).toBeNull();
   });
 });

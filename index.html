@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en" class="h-full preload" translate="no">
   <head>
+    <script>
+      const routeParams = new URLSearchParams(location.search);
+      if (routeParams.has("lobby-preview")) {
+        document.documentElement.classList.add("is-preview-mode");
+      }
+      if (routeParams.has("realtime-dev")) {
+        document.documentElement.classList.add("is-realtime-dev-mode");
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -153,17 +162,52 @@
     ></script>
 
     <!-- Cloudflare Turnstile -->
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-    ></script>
-
+    <script>
+      if (
+        !routeParams.has("lobby-preview") &&
+        !routeParams.has("realtime-dev")
+      ) {
+        const turnstileScript = document.createElement("script");
+        turnstileScript.src =
+          "https://challenges.cloudflare.com/turnstile/v0/api.js";
+        turnstileScript.async = true;
+        turnstileScript.defer = true;
+        document.head.append(turnstileScript);
+      }
+    </script>
   </head>
 
   <body
     class="select-none font-sans min-h-screen bg-neutral-800 transition-opacity duration-300 ease-in-out flex flex-row flex-wrap content-start"
   >
+    <style>
+      html.is-preview-mode desktop-nav-bar,
+      html.is-preview-mode mobile-nav-bar,
+      html.is-preview-mode #mobile-menu-backdrop,
+      html.is-preview-mode play-page,
+      html.is-preview-mode #turnstile-container,
+      html.is-realtime-dev-mode desktop-nav-bar,
+      html.is-realtime-dev-mode mobile-nav-bar,
+      html.is-realtime-dev-mode #mobile-menu-backdrop,
+      html.is-realtime-dev-mode play-page,
+      html.is-realtime-dev-mode #turnstile-container {
+        display: none !important;
+      }
+
+      html.is-preview-mode #page-realtime-lobby-preview,
+      html.is-realtime-dev-mode #page-realtime-lobby-preview {
+        display: block !important;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        overflow-y: auto;
+      }
+
+      html.is-preview-mode #page-realtime-lobby-preview.is-game-started,
+      html.is-realtime-dev-mode #page-realtime-lobby-preview.is-game-started {
+        display: none !important;
+      }
+    </style>
     <script>
       // Halloween theme (src/client/halloween.css), Oct 25 through Nov 1 local
       // time. It recolors the desktop logo, which is otherwise left unset.
@@ -239,16 +283,10 @@
 
       <banned-modal></banned-modal>
       <marketing-consent-toast></marketing-consent-toast>
-      <purchase-nudge-modal></purchase-nudge-modal>
 
       <!-- Main container with responsive padding -->
       <main-layout class="contents">
         <play-page class="contents"></play-page>
-        <matchmaking-modal
-          id="page-matchmaking"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></matchmaking-modal>
         <single-player-modal
           id="page-single-player"
           inline
@@ -264,32 +302,21 @@
           inline
           class="hidden w-full h-full page-content relative z-50"
         ></join-lobby-modal>
-        <store-modal
-          id="page-item-store"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></store-modal>
+        <realtime-lobby-preview
+          id="page-realtime-lobby-preview"
+          class="hidden w-full h-full page-content relative z-50 overflow-y-auto"
+        ></realtime-lobby-preview>
         <user-setting
           id="page-settings"
           inline
           class="hidden w-full h-full page-content relative z-50"
         ></user-setting>
-        <leaderboard-modal
-          id="page-leaderboard"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></leaderboard-modal>
         <troubleshooting-modal
           id="page-troubleshooting"
           inline
           class="hidden w-full h-full page-content relative z-50"
         ></troubleshooting-modal>
 
-        <clan-modal
-          id="page-clan"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></clan-modal>
         <account-modal
           id="page-account"
           inline
@@ -315,16 +342,6 @@
           inline
           class="hidden w-full h-full page-content relative z-50"
         ></language-modal>
-        <inventory-modal
-          id="page-inventory"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></inventory-modal>
-        <ranked-modal
-          id="page-ranked"
-          inline
-          class="hidden w-full h-full page-content relative z-50"
-        ></ranked-modal>
         <detailed-view-modal
           id="page-detailed-view"
           inline
@@ -340,7 +357,6 @@
       <!-- Opened from the nav profile menu (#modal=...) -->
       <account-settings-modal></account-settings-modal>
       <change-username-modal></change-username-modal>
-      <subscription-modal></subscription-modal>
     </div>
 
     <!-- Game components -->
@@ -417,12 +433,6 @@
     <performance-overlay></performance-overlay>
     <player-info-overlay></player-info-overlay>
     <heads-up-message></heads-up-message>
-
-    <!-- Featured stream: direct <body> child (NOT inside the in-[.in-game]:hidden
-         home container) so the Twitch iframe is never display:none'd during a game,
-         which would unmount the player and break ToS-compliant playback. The
-         component is position:fixed and self-manages visibility (pauses in-game). -->
-    <featured-stream></featured-stream>
 
     <!-- Scripts -->
     <script>

@@ -5,8 +5,8 @@
  * Modal → URL: when a router-managed modal opens, closes, or switches tabs,
  * update the URL via `history.replaceState` (no history entries).
  *
- * Lobby modals (join/host) and matchmaking are intentionally not registered:
- * they have their own URL state (path-based) or none at all.
+ * Lobby modals (join/host) are intentionally not registered: they have
+ * their own URL state (path-based) or none at all.
  *
  * A modal can also be opened by a path link (`/player/<id>`, see
  * registerPath). While it stays open the URL keeps that path, with tab

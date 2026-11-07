@@ -1,12 +1,7 @@
 import { ClientEnv } from "../ClientEnv";
 
 // The profile's tabs, as `?tab=` on a profile link names them.
-const PLAYER_PROFILE_TABS: readonly string[] = [
-  "stats",
-  "games",
-  "clans",
-  "progression",
-];
+const PLAYER_PROFILE_TABS: readonly string[] = ["stats", "games", "clans"];
 
 // Public ids are short url-safe tokens (the API stores at most 22
 // characters). Anything else in a profile path is not a link to a player.

@@ -1,7 +1,6 @@
 ﻿# Tests that fail intermittently on main (one of two runs only).
 # Same measurement as baseline-failures.txt.
 
-tests/client/InventoryModal.test.ts > InventoryModal announces flag, crown and skin selections too
-tests/client/InventoryModal.test.ts > InventoryModal navigates all four loadout categories
-tests/client/InventoryModal.test.ts > InventoryModal reacts to all settings keys changed outside Inventory
-tests/client/InventoryModal.test.ts > InventoryModal resynchronizes equipped Effects cards when the grid remounts
+# One-off in the Phase 1 group 4a full-suite runs; 20/20 pass isolated.
+tests/client/MainInitialize.test.ts > Client.initialize() booted from Main.ts module scope hands the lobby modals the event bus before a loader can open them
+tests/client/replay/codec/ReplayFormat.test.ts > a game still being processed with the rest appended, it reads like the finished replay

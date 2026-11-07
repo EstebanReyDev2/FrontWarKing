@@ -1,0 +1,18 @@
+# natural.txt — 16 slots: 12 fixed + 3 player + 1 transparent.
+# Terrain and sprites share the twelve fixed colours.
+.  -            transparent
+k  #172022      ink
+d  #295d77      water-deep
+w  #4785b5      water-shallow
+s  #c9b98a      sand
+g  #70844b      grass
+f  #356346      forest
+h  #999b91      highland
+m  #e8e3d9      mountain
+b  #49372c      wood
+r  #a54e3f      brick
+a  #d8c49a      plaster
+y  #e0bd57      gold
+P  @player-fill
+B  @player-border
+C  @player-accent

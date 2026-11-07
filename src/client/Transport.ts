@@ -58,6 +58,12 @@ import {
   SendUpdateGameConfigIntentEvent,
 } from "./LobbyEvents";
 import { LocalServer } from "./LocalServer";
+import { RealtimeSession } from "./netcode/RealtimeSession";
+import {
+  createSupabaseRealtimeClient,
+  SupabaseBroadcastTransport,
+} from "./netcode/SupabaseBroadcastTransport";
+import { supabaseRealtimeConfig } from "./netcode/SupabaseConfig";
 import { describeSocketClose } from "./SocketClose";
 import { homeHref, translateText } from "./Utils";
 import { PlayerView } from "./view";
@@ -266,6 +272,7 @@ export class Transport {
   // Consecutive retries that have not yet produced a server frame.
   private reconnectAttempts = 0;
   public readonly isLocal: boolean;
+  private readonly realtimeSession: RealtimeSession | null = null;
   // Latched by a terminal close (a rejection the server will repeat), by
   // exhausting the reconnect budget, and by leaving the game. Blocks
   // scheduleReconnect and connectRemote so nothing reopens the socket.
@@ -292,8 +299,15 @@ export class Transport {
     // If gameRecord is not null, we are replaying an archived game.
     // For multiplayer games, GameConfig is not known until game starts.
     this.isLocal =
-      this.lobbyConfig.gameRecord !== undefined ||
-      this.lobbyConfig.gameStartInfo?.config.gameType === GameType.Singleplayer;
+      this.lobbyConfig.realtime === undefined &&
+      (this.lobbyConfig.gameRecord !== undefined ||
+        this.lobbyConfig.gameStartInfo?.config.gameType ===
+          GameType.Singleplayer);
+    if (this.lobbyConfig.realtime !== undefined) {
+      this.realtimeSession = this.createRealtimeSession(
+        this.lobbyConfig.realtime,
+      );
+    }
 
     this.subscribe(SendAllianceRequestIntentEvent, (e) =>
       this.onSendAllianceRequest(e),
@@ -374,6 +388,45 @@ export class Transport {
     });
   }
 
+  private createRealtimeSession(
+    realtime: NonNullable<LobbyConfig["realtime"]>,
+  ): RealtimeSession {
+    const transport =
+      realtime.transport ??
+      (() => {
+        const config = supabaseRealtimeConfig();
+        if (config === null) {
+          throw new Error(
+            "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY",
+          );
+        }
+        return new SupabaseBroadcastTransport({
+          client: createSupabaseRealtimeClient(config),
+          gameID: this.lobbyConfig.gameID,
+          clientID: realtime.clientID,
+          hostID: realtime.hostID,
+        });
+      })();
+    return new RealtimeSession({
+      gameID: this.lobbyConfig.gameID,
+      clientID: realtime.clientID,
+      hostID: realtime.hostID,
+      nickname: this.lobbyConfig.playerName,
+      gameStartInfo: this.lobbyConfig.gameStartInfo,
+      transport,
+      term: realtime.term,
+      clock: realtime.clock,
+      allowGeneralHello: realtime.allowGeneralHello ?? false,
+      onMessage: (message) => this.onmessage(message),
+      onStateChange: (state) => {
+        if (state.status === "error") {
+          console.warn("[realtime] transport error:", state.message);
+        }
+      },
+      onError: (message) => console.error("[realtime]", message),
+    });
+  }
+
   private subscribe<T extends GameEvent>(
     eventType: EventConstructor<T>,
     handler: (event: T) => void,
@@ -405,6 +458,17 @@ export class Transport {
     onconnect: () => void,
     onmessage: (message: ServerMessage) => void,
   ) {
+    this.onconnect = onconnect;
+    this.onmessage = onmessage;
+    if (this.realtimeSession !== null) {
+      void this.realtimeSession
+        .connect(onconnect, (message) => this.onmessage(message))
+        .catch((error) => {
+          console.error("[realtime] connect failed", error);
+          this.handleConnectionRefused(CloseReason.Unknown);
+        });
+      return;
+    }
     if (this.isLocal) {
       this.connectLocal(onconnect, onmessage);
     } else {
@@ -416,6 +480,11 @@ export class Transport {
     onconnect: () => void,
     onmessage: (message: ServerMessage) => void,
   ) {
+    if (this.realtimeSession !== null) {
+      this.onconnect = onconnect;
+      this.onmessage = onmessage;
+      return;
+    }
     if (this.isLocal) {
       this.localServer.updateCallback(onconnect, onmessage);
     } else {
@@ -645,6 +714,10 @@ export class Transport {
   // one attempt is scheduled at a time, on the backoff schedule, until the
   // budget runs out.
   public reconnect() {
+    if (this.realtimeSession !== null) {
+      void this.realtimeSession.reconnect();
+      return;
+    }
     if (this.isLocal) {
       this.connect(this.onconnect, this.onmessage);
       return;
@@ -702,12 +775,20 @@ export class Transport {
   }
 
   public turnComplete() {
+    if (this.realtimeSession !== null) {
+      this.realtimeSession.turnComplete();
+      return;
+    }
     if (this.isLocal) {
       this.localServer.turnComplete();
     }
   }
 
   async joinGame() {
+    if (this.realtimeSession !== null) {
+      await this.realtimeSession.joinGame();
+      return;
+    }
     // Only the first join: the token is short-lived, and a later reconnect
     // must not present one that has since expired.
     const token = this.lobbyConfig.creatorToken ?? (await getPlayToken());
@@ -729,6 +810,10 @@ export class Transport {
   }
 
   async rejoinGame(lastTurn: number) {
+    if (this.realtimeSession !== null) {
+      await this.realtimeSession.rejoinGame(lastTurn);
+      return;
+    }
     this.sendMsg({
       type: "rejoin",
       gameID: this.lobbyConfig.gameID,
@@ -742,6 +827,11 @@ export class Transport {
   leaveGame() {
     for (const unsubscribe of this.unsubscribers.splice(0)) {
       unsubscribe();
+    }
+    if (this.realtimeSession !== null) {
+      this.connectionRefused = true;
+      void this.realtimeSession.leaveGame();
+      return;
     }
     if (this.isLocal) {
       this.localServer.endGame();
@@ -947,6 +1037,10 @@ export class Transport {
   }
 
   private onSendHashEvent(event: SendHashEvent) {
+    if (this.realtimeSession !== null) {
+      this.realtimeSession.reportHash(event.tick, event.hash);
+      return;
+    }
     if (this.isLocal || this.socket?.readyState === WebSocket.OPEN) {
       this.sendMsg({
         type: "hash",
@@ -1021,6 +1115,10 @@ export class Transport {
   }
 
   private sendIntent(intent: Intent) {
+    if (this.realtimeSession !== null) {
+      this.realtimeSession.sendIntent(intent);
+      return;
+    }
     const msg = {
       type: "intent",
       intent: intent,

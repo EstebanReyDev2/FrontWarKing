@@ -49,7 +49,7 @@ describe("playerProfileRouteArgs", () => {
   });
 
   it("takes a known tab from ?tab=", () => {
-    for (const tab of ["stats", "games", "clans", "progression"]) {
+    for (const tab of ["stats", "games", "clans"]) {
       expect(
         playerProfileRouteArgs({
           pathname: "/player/aB3dE5fX/",
@@ -60,12 +60,14 @@ describe("playerProfileRouteArgs", () => {
   });
 
   it("drops an unknown tab", () => {
-    expect(
-      playerProfileRouteArgs({
-        pathname: "/player/aB3dE5fX",
-        search: "?tab=friends",
-      }),
-    ).toEqual({ publicID: "aB3dE5fX" });
+    for (const tab of ["friends", "progression"]) {
+      expect(
+        playerProfileRouteArgs({
+          pathname: "/player/aB3dE5fX",
+          search: `?tab=${tab}`,
+        }),
+      ).toEqual({ publicID: "aB3dE5fX" });
+    }
   });
 
   it("is null for any other page", () => {

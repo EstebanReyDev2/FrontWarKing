@@ -10,10 +10,9 @@ import { UserSettings } from "../UserSettings";
 import { translateText } from "../Utils";
 
 /**
- * The shared game-start alert used while waiting in either a lobby or
- * ranked matchmaking. It deliberately owns the whole behavior so the two
- * entry paths cannot drift: the bell, toast, audio priming, chime and desktop
- * notification are identical.
+ * The shared game-start alert used while waiting in a lobby. It owns the
+ * whole behavior so every lobby entry path cannot drift: the bell, toast,
+ * audio priming, chime and desktop notification are identical.
  */
 export class GameStartAlertController implements ReactiveController {
   private armed = false;

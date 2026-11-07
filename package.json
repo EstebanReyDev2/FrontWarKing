@@ -2,7 +2,7 @@
   "name": "openfront-client",
   "engines": {
     "node": ">=24.15.0 <25",
-    "npm": ">=12.1.0 <13"
+    "npm": ">=11.0.0"
   },
   "workspaces": [
     "packages/*"
@@ -10,6 +10,7 @@
   "scripts": {
     "build-dev": "concurrently \"tsc --noEmit\" \"vite build --mode development\"",
     "build-prod": "concurrently --kill-others-on-fail \"tsc --noEmit\" \"vite build\" && tsx scripts/buildAssetHashes.ts",
+    "build-vercel": "vite build && tsx scripts/buildAssetHashes.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p packages/engine-api && tsc --noEmit -p packages/engine-lib && tsc --noEmit -p packages/engine && tsc --noEmit -p packages/engine/src/worker && tsc --noEmit -p packages/shared && tsc --noEmit -p packages/zbin",
     "start:client": "vite",
     "start:server": "tsx src/server/Server.ts",
@@ -27,6 +28,7 @@
     "perf": "npx tsx tests/perf/run-all.ts",
     "perf:game": "npx tsx tests/perf/fullgame/FullGamePerf.ts",
     "replay:game": "npx tsx tests/replay/ReplayGame.ts",
+    "realtime:smoke": "npx tsx scripts/realtime-smoke.ts",
     "perf:client": "npx tsx tests/perf/client/ClientUpdatePerf.ts",
     "perf:client-mem": "npx tsx tests/perf/client/ClientMemoryPerf.ts",
     "perf:client-tick": "npx tsx tests/perf/client/ClientTickPerf.ts",
@@ -113,7 +115,7 @@
     "@opentelemetry/sdk-metrics": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "@opentelemetry/winston-transport": "^0.26.0",
-    "@stripe/stripe-js": "9.15.0",
+    "@supabase/supabase-js": "2.118.0",
     "@types/compression": "^1.8.1",
     "colord": "^2.9.3",
     "compression": "^1.8.1",

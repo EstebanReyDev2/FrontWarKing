@@ -9,10 +9,8 @@ import { copyToClipboard, showToast, translateText } from "../Utils";
 // phone or tablet with a native share sheet, one Share button opens that
 // instead, since it already offers every app the player has.
 //
-// Laid out as a row of buttons (the profile, the prestige ceremony), or as one
-// labelled button that opens the same three as a menu (the end-of-game
-// popup's footer, where a row doesn't fit). The link can carry a moment
-// (`?moment=level50`) with its own line: see MomentShare.
+// Laid out as a row of buttons (the profile), or as one labelled button that
+// opens the same three as a menu.
 
 /** The X (Twitter) compose URL for a link and a line of text. */
 export function xShareUrl(url: string, text: string): string {
@@ -39,9 +37,7 @@ const BUTTON_BASE =
   "relative inline-flex min-h-[38px] items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-semibold text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/30";
 // On a panel, the buttons are a light tint of it.
 const BUTTON = `${BUTTON_BASE} border-white/15 bg-white/5 hover:bg-white/10`;
-// Over a busy backdrop (the prestige ceremony's honeycomb), they need a
-// backing of their own to read.
-const BUTTON_SOLID = `${BUTTON_BASE} border-white/20 bg-zinc-900/85 shadow-lg backdrop-blur-sm hover:bg-zinc-800/95`;
+
 
 // The share ring: a quick yellow flash around a share button when a mouse
 // moves onto it or the keyboard focuses it. At full strength at once, held,
@@ -182,8 +178,6 @@ export class ProfileShare extends LitElement {
   @property({ type: String }) label = "";
   // The menu button's classes, so it can match the buttons beside it.
   @property({ type: String }) triggerClass = "";
-  // Opaque buttons, for a busy backdrop.
-  @property({ type: Boolean }) solid = false;
   // Centre the row.
   @property({ type: Boolean }) centered = false;
 
@@ -456,7 +450,7 @@ export class ProfileShare extends LitElement {
   ): TemplateResult {
     return html`<button
       type="button"
-      class=${this.solid ? BUTTON_SOLID : BUTTON}
+      class=${BUTTON}
       data-share=${action}
       @click=${onClick}
       @pointerenter=${(e: PointerEvent) => this.onRingPointer(e)}

@@ -4,7 +4,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import { isSteamPrimaryUser } from "../AccountIdentity";
 import {
   deleteAccount,
-  setLevelVisibility,
   setMarketingConsent,
   setSearchVisibility,
   type SetVisibilityResult,
@@ -13,13 +12,11 @@ import { clearLocalSession, linkGoogle, sendMagicLink } from "../Auth";
 import { isDesktopShell } from "../DesktopShell";
 import { gamePortal } from "../GamePortal";
 import { showInGameAlert } from "../InGameModal";
-import { refreshOwnHiddenLevelBadge } from "../OwnLevelBadge";
 import { steamSDK } from "../SteamSDK";
 import { translateText } from "../Utils";
 import "./baseComponents/Button";
 import "./DeleteAccountDialog";
 import "./IdentityTokenCard";
-import "./LevelBadge";
 import { googleLinkButton } from "./ui/GoogleLinkButton";
 
 type UserMePlayer = UserMeResponse["player"];
@@ -27,15 +24,11 @@ type UserMeUser = UserMeResponse["user"];
 
 // The /users/@me privacy flags the Privacy card toggles, each with the request
 // that stores it and the alert shown when that request fails.
-type PrivacyField = "levelHidden" | "searchHidden";
+type PrivacyField = "searchHidden";
 const PRIVACY_SETTINGS: Record<
   PrivacyField,
   { save: (hidden: boolean) => Promise<SetVisibilityResult>; failedKey: string }
 > = {
-  levelHidden: {
-    save: (hidden) => setLevelVisibility(hidden),
-    failedKey: "account_modal.level_visibility_failed",
-  },
   searchHidden: {
     save: (hidden) => setSearchVisibility(hidden),
     failedKey: "account_modal.search_visibility_failed",
@@ -61,7 +54,6 @@ export class AccountSettingsPanel extends LitElement {
   @state() private consentBusy: boolean = false;
   // Per setting, so one switch's request in flight never locks the other.
   @state() private privacyBusy: Record<PrivacyField, boolean> = {
-    levelHidden: false,
     searchHidden: false,
   };
   @state() private deleteDialogOpen: boolean = false;
@@ -159,16 +151,12 @@ export class AccountSettingsPanel extends LitElement {
     `;
   }
 
-  // Privacy: "Show my level to other players" and "Show my profile in search
-  // engines". Each row only when /users/@me carries its setting at all, and
-  // the card only when it carries either — an older API without them gets no
+  // Privacy: "Show my profile in search engines". The row only appears when
+  // /users/@me carries the setting at all; an older API without it gets no
   // card.
   private renderPrivacyCard(): TemplateResult | typeof nothing {
-    const levelHidden = this.player?.levelHidden;
     const searchHidden = this.player?.searchHidden;
-    if (levelHidden === undefined && searchHidden === undefined) {
-      return nothing;
-    }
+    if (searchHidden === undefined) return nothing;
     return html`
       <div class="bg-white/5 rounded-xl border border-white/10 p-6">
         <div
@@ -176,31 +164,13 @@ export class AccountSettingsPanel extends LitElement {
         >
           ${translateText("account_modal.privacy_title")}
         </div>
-        ${levelHidden === undefined
-          ? nothing
-          : html`${this.renderPrivacySwitchRow(
-              translateText("account_modal.level_visibility_title"),
-              translateText("account_modal.level_visibility_desc"),
-              !levelHidden,
-              this.privacyBusy.levelHidden,
-              (shown) => this.setPrivacyShown("levelHidden", shown),
-            )}
-            ${this.renderLevelPreview(!levelHidden)}`}
-        ${searchHidden === undefined
-          ? nothing
-          : html`<div
-              class=${levelHidden === undefined
-                ? ""
-                : "mt-4 pt-4 border-t border-white/10"}
-            >
-              ${this.renderPrivacySwitchRow(
-                translateText("account_modal.search_visibility_title"),
-                translateText("account_modal.search_visibility_desc"),
-                !searchHidden,
-                this.privacyBusy.searchHidden,
-                (shown) => this.setPrivacyShown("searchHidden", shown),
-              )}
-            </div>`}
+        ${this.renderPrivacySwitchRow(
+          translateText("account_modal.search_visibility_title"),
+          translateText("account_modal.search_visibility_desc"),
+          !searchHidden,
+          this.privacyBusy.searchHidden,
+          (shown) => this.setPrivacyShown("searchHidden", shown),
+        )}
       </div>
     `;
   }
@@ -236,43 +206,6 @@ export class AccountSettingsPanel extends LitElement {
               : "translate-x-1"}"
           ></span>
         </button>
-      </div>
-    `;
-  }
-
-  // "Others see": the player's name as other players get it — with their
-  // level badge, or without it and marked hidden. Decorative (the switch
-  // carries the state), so hidden from assistive tech. Needs the player's
-  // level, so it is left out when progression is off.
-  private renderLevelPreview(shown: boolean): TemplateResult | typeof nothing {
-    const progress = this.player?.progress;
-    if (progress === undefined) return nothing;
-    return html`
-      <div
-        class="level-visibility-preview mt-4 flex items-center gap-3 rounded-lg bg-black/20 border border-white/5 px-4 py-3"
-        aria-hidden="true"
-      >
-        <span
-          class="text-[10px] uppercase tracking-widest font-bold text-white/40"
-          >${translateText("account_modal.level_visibility_others_see")}</span
-        >
-        <span class="flex items-center gap-1.5 text-white font-semibold">
-          ${shown
-            ? html`<level-badge
-                class="shrink-0"
-                .level=${progress.level}
-                .prestige=${progress.prestige}
-                ?legend=${progress.legend}
-                size="24"
-              ></level-badge>`
-            : nothing}
-          ${this.player?.username ?? ""}
-        </span>
-        ${shown
-          ? nothing
-          : html`<span class="ml-auto text-xs text-white/40"
-              >${translateText("account_modal.level_visibility_hidden")}</span
-            >`}
       </div>
     `;
   }
@@ -463,12 +396,6 @@ export class AccountSettingsPanel extends LitElement {
     const result = await setting.save(hidden);
     player[field] = result.ok ? result.hidden : previous;
     this.privacyBusy = { ...this.privacyBusy, [field]: false };
-    // The viewer's own-badge fallback (lobby roster, in-game panel) reads the
-    // same cached profile: re-read it now so a level change shows without
-    // waiting for the next lobby.
-    if (result.ok && field === "levelHidden") {
-      void refreshOwnHiddenLevelBadge();
-    }
 
     // 401: logOut() has already run and the signed-out state takes over —
     // nothing to tell the player here.
