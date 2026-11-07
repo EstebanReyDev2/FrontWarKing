@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildAtlas > is deterministic and matches the stored layout 1`] = `
+{
+  "test_anim": {
+    "frames": 4,
+    "h": 16,
+    "w": 16,
+    "x": 0,
+    "y": 0,
+  },
+  "test_static": {
+    "frames": 1,
+    "h": 16,
+    "w": 16,
+    "x": 64,
+    "y": 0,
+  },
+  "test_variant": {
+    "frames": 1,
+    "h": 16,
+    "w": 16,
+    "x": 80,
+    "y": 0,
+  },
+}
+`;

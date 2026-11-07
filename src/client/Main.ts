@@ -72,6 +72,7 @@ import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
 import { mountRealtimeDev } from "./RealtimeDev";
 import "./lobby/RealtimeLobbyPreview";
 import {
+  isPixelDevRoute,
   isPreviewRoute,
   shouldLoadInitialAuth,
   shouldLoadTurnstile,
@@ -222,7 +223,13 @@ export interface JoinLobbyEvent {
  */
 export function startServerListPollingForRoute(search: string): void {
   const params = new URLSearchParams(search);
-  if (params.has("lobby-preview") || params.has("realtime-dev")) return;
+  if (
+    params.has("lobby-preview") ||
+    params.has("realtime-dev") ||
+    params.has("pixel-dev")
+  ) {
+    return;
+  }
   startServerListPolling();
 }
 
@@ -538,6 +545,13 @@ class Client {
     );
 
     // Opt-in only; a normal boot returns false without touching the DOM.
+    // The dev page pulls in render/pixel, so it is loaded on demand: the
+    // homepage bundle must not include renderer code.
+    if (isPixelDevRoute()) {
+      void import("./PixelDev")
+        .then(({ mountPixelDev }) => mountPixelDev())
+        .catch((error: unknown) => console.error("pixel-dev failed:", error));
+    }
     mountRealtimeDev();
 
     const hlpModal = document.querySelector("help-modal") as HelpModal | null;
