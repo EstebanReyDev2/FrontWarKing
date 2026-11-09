@@ -70,6 +70,7 @@ import { initNavigation } from "./Navigation";
 import { capturePagePin } from "./PagePin";
 import { fallbackPlayerName, LAPSE_NOTICE_KEY } from "./PlayerName";
 import { mountRealtimeDev } from "./RealtimeDev";
+import { pixelQuerySuffix } from "./PixelFlag";
 import "./lobby/RealtimeLobbyPreview";
 import {
   isPixelDevRoute,
@@ -1421,6 +1422,9 @@ class Client {
       setInGameSignal(true);
 
       const lobbyIdHidden = !this.userSettings.lobbyIdVisibility();
+      // The join flow may already have rewritten the address bar (share link),
+      // so this reads the flag captured when the page loaded, not the live URL.
+      const pixelSuffix = pixelQuerySuffix();
       if (isReplayShellHost(window.location.hostname)) {
         // Keep the canonical replay URL (replay.<domain>/<gameId>): the
         // /game/<id> shape and the #refresh trampoline only exist on the
@@ -1438,7 +1442,7 @@ class Client {
           currentPagePath(
             lobbyIdHidden
               ? "/streamer-mode"
-              : `${ClientEnv.gamePath(lobby.gameID)}?live`,
+              : `${ClientEnv.gamePath(lobby.gameID)}?live${pixelSuffix}`,
           ),
         );
       }
@@ -1512,6 +1516,8 @@ class Client {
       gamePortal.loadingStop();
       gamePortal.gameplayStart();
       setInGameSignal(true);
+      // Same as above: the boot-time flag survives the address bar rewrites.
+      const pixelSuffix = pixelQuerySuffix();
       if (window.location.hash === "" || window.location.hash === "#") {
         history.replaceState(null, "", window.location.origin + "#refresh");
       }
@@ -1521,7 +1527,7 @@ class Client {
         currentPagePath(
           !this.userSettings.lobbyIdVisibility()
             ? "/streamer-mode"
-            : `${ClientEnv.gamePath(start.gameID)}?live`,
+            : `${ClientEnv.gamePath(start.gameID)}?live${pixelSuffix}`,
         ),
       );
       this.currentUrl = window.location.href;

@@ -47,6 +47,7 @@ import { NamePass } from "./passes/name-pass";
 import { NightCompositePass } from "./passes/NightCompositePass";
 import { NukeTelegraphPass } from "./passes/NukeTelegraphPass";
 import { NukeTrajectoryPass } from "./passes/NukeTrajectoryPass";
+import { PixelStructurePass } from "./passes/PixelStructurePass";
 import { PointLightPass } from "./passes/PointLightPass";
 import { RailroadPass } from "./passes/RailroadPass";
 import { RangeCirclePass } from "./passes/RangeCirclePass";
@@ -65,6 +66,7 @@ import { TrailPass } from "./passes/TrailPass";
 import { UnitPass } from "./passes/UnitPass";
 import { WorldTextPass } from "./passes/WorldTextPass";
 import type { RenderSettings } from "./RenderSettings";
+import { parsePixelStyle } from "../pixel/PixelStyle";
 import { AffiliationPalette } from "./utils/Affiliation";
 import {
   EFFECT_PALETTE_BLOCKS,
@@ -129,7 +131,9 @@ export class GPURenderer {
   private falloutLightPass: FalloutLightPass;
   private lightmapPass: LightmapPass;
   private nightCompositePass: NightCompositePass;
-  private structurePass: StructurePass;
+  private structurePass: StructurePass | PixelStructurePass;
+  /** Non-null only in pixel mode; the classic pass has no sprite palette. */
+  private pixelStructurePass: PixelStructurePass | null = null;
   private structureLevelPass: StructureLevelPass;
   private unitPass: UnitPass;
   private namePass: NamePass;
@@ -563,13 +567,25 @@ export class GPURenderer {
     this.crosshairPass = new CrosshairPass(gl);
 
     // --- Remaining passes (unchanged from v1) ---
-    this.structurePass = new StructurePass(
-      gl,
-      header,
-      this.paletteTex,
-      this.effectTex,
-      this.settings,
-    );
+    // The pixel style is chosen once, here, from ?pixel=; both classes expose
+    // the same API so nothing downstream branches on the style.
+    if (parsePixelStyle().includes("structures")) {
+      this.pixelStructurePass = new PixelStructurePass(
+        gl,
+        header,
+        this.paletteData,
+        this.settings,
+      );
+      this.structurePass = this.pixelStructurePass;
+    } else {
+      this.structurePass = new StructurePass(
+        gl,
+        header,
+        this.paletteTex,
+        this.effectTex,
+        this.settings,
+      );
+    }
     this.structureLevelPass = new StructureLevelPass(gl, header, this.settings);
     this.unitPass = new UnitPass(
       gl,
@@ -741,6 +757,8 @@ export class GPURenderer {
     this.samRadiusPass.setPaletteData(this.paletteData);
     // Name pass caches per-player colors and bakes them into slot rows
     this.namePass.refreshPlayerColors(this.paletteData);
+    // Pixel structures resolve P/B/C from the sprite palette texture
+    this.pixelStructurePass?.refreshPalette(this.paletteData);
   }
 
   /** Re-upload the per-player effect texture (style + colors by smallID). */

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { pixelQuerySuffix } from "../../../../src/client/PixelFlag";
 import {
   parsePixelStyle,
   PIXEL_FEATURES,
@@ -56,5 +57,53 @@ describe("parsePixelStyle", () => {
         "structures",
       ),
     ).toBe(true);
+  });
+});
+
+describe("pixelQuerySuffix", () => {
+  it("returns nothing when the page has no pixel flag", () => {
+    expect(pixelQuerySuffix("")).toBe("");
+    expect(pixelQuerySuffix("?lobby-preview=1")).toBe("");
+    expect(pixelQuerySuffix("?pixel=")).toBe("");
+  });
+
+  it("carries the flag into the game URL", () => {
+    expect(pixelQuerySuffix("?pixel=off")).toBe("&pixel=off");
+    expect(pixelQuerySuffix("?lobby-preview=1&pixel=structures,units")).toBe(
+      "&pixel=structures%2Cunits",
+    );
+  });
+
+  it("produces a URL the renderer parses back to the same style", () => {
+    for (const search of ["?pixel=off", "?pixel=all", "?pixel=units"]) {
+      const gameUrl = `?live${pixelQuerySuffix(search)}`;
+      expect(parsePixelStyle(gameUrl).mode).toBe(
+        parsePixelStyle(search).mode,
+      );
+    }
+  });
+});
+
+describe("boot search snapshot", () => {
+  it("keeps the flag after the join flow rewrites the address bar", async () => {
+    const original = window.location.href;
+    try {
+      // The page loads with the flag...
+      history.replaceState(null, "", "/?pixel=off");
+      vi.resetModules();
+      // Both modules are re-evaluated together: PixelStyle reads the boot
+      // search that PixelFlag captured on import.
+      const boot = await import(
+        "../../../../src/client/render/pixel/PixelStyle"
+      );
+      const flag = await import("../../../../src/client/PixelFlag");
+      // ...then the join flow replaces the URL with the game entry.
+      history.replaceState(null, "", "/w0/game/abcdefgh?live");
+      expect(window.location.search).toBe("?live");
+      expect(flag.pixelQuerySuffix()).toBe("&pixel=off");
+      expect(boot.parsePixelStyle().mode).toBe("off");
+    } finally {
+      history.replaceState(null, "", original);
+    }
   });
 });

@@ -10,7 +10,12 @@
  *
  * The flag is presentation only. It is parsed from the URL and never reaches
  * the engine, the wire format or a replay file.
+ *
+ * The search string is captured at boot by `src/client/PixelFlag.ts`, which the
+ * homepage can import without pulling renderer code into its first download.
  */
+
+import { bootSearch } from "../../PixelFlag";
 
 export const PIXEL_FEATURES = [
   "terrain",
@@ -32,15 +37,11 @@ export interface PixelStyle {
   includes(feature: PixelFeature): boolean;
 }
 
-function defaultSearch(): string {
-  return typeof window === "undefined" ? "" : window.location.search;
-}
-
 function isFeature(value: string): value is PixelFeature {
   return (PIXEL_FEATURES as readonly string[]).includes(value);
 }
 
-export function parsePixelStyle(search = defaultSearch()): PixelStyle {
+export function parsePixelStyle(search = bootSearch): PixelStyle {
   const raw = new URLSearchParams(search).get("pixel");
   if (raw === null || raw.trim() === "" || raw.trim().toLowerCase() === "all") {
     const features = new Set<PixelFeature>(PIXEL_FEATURES);

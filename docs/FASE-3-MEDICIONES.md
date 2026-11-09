@@ -148,3 +148,99 @@ Tomado de `docs/FASE-3-DISENO.md` §6.2, contra esta baseline:
 - Medir stutter al panear (frame time máximo durante un paneo continuo).
 - Confirmar que la construcción del atlas entra en ≤ 20 ms.
 - Repetir esta tabla con el estilo nuevo y comparar fila por fila.
+
+## 8. F3b — Estructuras con sprites (2026-11-09)
+
+### 8.1 Método
+
+Misma máquina, navegador y ventana que la baseline (§1). Viewport real
+**800×574** con DPR 1, que es el tamaño que la app entrega al canvas en esta
+máquina; por eso la comparación válida es contra la tabla §4.2 (15.7 / 16.1 /
+17.7 draw calls), no contra la de 1080p.
+
+Escenario: singleplayer Europe, 1 humano + 20 bots, 52 naciones, aparición
+aleatoria, sin modificadores. Para que ambos estilos miren la misma escena, la
+cámara se centró con el `goTo` del propio juego sobre la primera `City` del
+mapa (`build-menu.transformHandler`) y después se fijó el zoom con las teclas
+`-` / `=` en lazo cerrado (±2 %). Las 52 ciudades existen desde el inicio de
+la partida, así que no hace falta esperar a que los bots construyan.
+
+Instrumentación idéntica a §3: deltas de `requestAnimationFrame` durante 5 s
+(301 frames) y parche de `WebGL2RenderingContext.prototype` para
+`drawArrays`, `drawElements`, `drawArraysInstanced`, `drawElementsInstanced` y
+`drawRangeElements`, contando por frame.
+
+### 8.2 Corrida A/B
+
+Corrida A: `?pixel=off` (`StructurePass` clásico). Corrida B: `?pixel=all`
+(`PixelStructurePass`). Partidas distintas, mismo escenario.
+
+| Zoom | Estilo | Zoom real | FPS | Frame time prom. | p95 | Máx. | Draw calls/frame |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.5 | off | 0.502 | 60.2 | 16.61 ms | 16.9 ms | 17.3 ms | 15.2 |
+| 0.5 | all | 0.494 | 60.1 | 16.64 ms | 16.9 ms | 17.0 ms | 16.0 |
+| 1 | off | 1.005 | 60.2 | 16.62 ms | 16.9 ms | 17.0 ms | 17.0 |
+| 1 | all | 1.019 | 60.1 | 16.65 ms | 16.9 ms | 17.1 ms | 16.0 |
+| 4 | off | 3.935 | 60.2 | 16.62 ms | 16.9 ms | 17.3 ms | 16.8 |
+| 4 | all | 3.958 | 60.0 | 16.66 ms | 16.9 ms | 17.0 ms | 16.8 |
+
+A zoom 4 la corrida B tenía 53 estructuras en pantalla (`instanceCount` del
+pase). Los draw calls quedan dentro del rango de la baseline de 800×574 y la
+diferencia entre estilos es ≤ 0.8, es decir, el pase nuevo no agrega un draw
+call neto: reemplaza al clásico (1 vs 1).
+
+### 8.3 LOD y capturas
+
+Capturas tomadas en la partida real (`?pixel=all`, 52 ciudades), cámara
+centrada en una ciudad:
+
+| Zoom | Qué se ve |
+| --- | --- |
+| 0.5 | mapa completo; las estructuras son puntos de color (LOD por debajo de `dotsZoomThreshold = 1.2`). |
+| 1 | puntos de color sobre cada ciudad. |
+| 2 | sprites de ciudad a tamaño intermedio, con la bandera del jugador dueño. |
+| 4 | sprites de ciudad 32×32 nítidos, con el tejado y la bandera en el color del jugador. |
+
+Las capturas se guardaron fuera del repo (son evidencia de la corrida, no
+assets): `%TEMP%\opencode-browser-*\0\screenshot.png` de cada pasada. No se
+versionan para no romper la regla de "cero archivos de imagen nuevos".
+
+### 8.4 Memoria de texturas
+
+El atlas de sprites nuevo es una textura **16×4096 RGBA8** = **0.25 MB**
+(0.14 % de los 183.1 MB de la baseline). La paleta de sprites se arma en CPU a
+partir de `paletteData` y se sube a esa misma textura: no hay una textura por
+jugador ni un atlas PNG nuevo. El resto del footprint no cambia.
+
+### 8.5 Veredicto
+
+| Métrica | Aprobado | Medido | Resultado |
+| --- | --- | --- | --- |
+| FPS promedio | ≥ 55 en los 3 zooms | 60.0–60.2 | ✅ |
+| Frame time p95 | ≤ 20 ms | 16.9 ms | ✅ |
+| Frame time máximo | ≤ 50 ms | 17.4 ms | ✅ |
+| Draw calls | ≤ baseline + 1 | 16.0 / 16.0 / 16.8 vs 15.7 / 16.1 / 17.7 | ✅ |
+| Memoria de texturas | no aumentar | +0.25 MB (atlas) | ✅ (0.14 %) |
+
+### 8.6 Bug encontrado: el flag se perdía al iniciar partida
+
+`?pixel=off` se leía con `window.location.search` en el constructor del
+renderer, pero el flujo de join reescribe la barra de direcciones antes de
+crearlo: `updateJoinUrlForShare` (`Main.ts`) deja la URL de invitación sin
+query, y el `#refresh` + `pushState` de `handleJoinLobby` deja
+`/<game>?live`. Resultado: la partida siempre arrancaba con el estilo pixel
+aunque la página hubiera cargado con `?pixel=off`.
+
+Arreglo: `src/client/PixelFlag.ts` captura el search **una sola vez al cargar
+el módulo** (`bootSearch`) y tanto `parsePixelStyle()` como
+`pixelQuerySuffix()` lo usan por defecto. El módulo vive fuera de `render/` a
+propósito: `Main.ts` lo importa estáticamente para armar la URL del juego y la
+regla de `tests/LayerBoundaries.test.ts` prohíbe que el homepage arrastre
+código del renderer en su primera descarga. El flag viaja además en la URL de
+la partida (`?live&pixel=off`) para que un F5 conserve el estilo. Verificado en
+runtime:
+la URL queda `.../game/<id>?live&pixel=off` y
+`structurePass.constructor.name === "StructurePass"`; con `?pixel=all` queda
+`?live&pixel=all` y `PixelStructurePass`. Test de regresión en
+`tests/client/render/pixel/PixelStyle.test.ts` (reescribe la URL después de
+cargar el módulo y comprueba que el flag sobrevive).
