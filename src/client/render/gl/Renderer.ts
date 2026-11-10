@@ -48,6 +48,7 @@ import { NightCompositePass } from "./passes/NightCompositePass";
 import { NukeTelegraphPass } from "./passes/NukeTelegraphPass";
 import { NukeTrajectoryPass } from "./passes/NukeTrajectoryPass";
 import { PixelStructurePass } from "./passes/PixelStructurePass";
+import { PixelUnitPass } from "./passes/PixelUnitPass";
 import { PointLightPass } from "./passes/PointLightPass";
 import { RailroadPass } from "./passes/RailroadPass";
 import { RangeCirclePass } from "./passes/RangeCirclePass";
@@ -135,7 +136,9 @@ export class GPURenderer {
   /** Non-null only in pixel mode; the classic pass has no sprite palette. */
   private pixelStructurePass: PixelStructurePass | null = null;
   private structureLevelPass: StructureLevelPass;
-  private unitPass: UnitPass;
+  private unitPass: UnitPass | PixelUnitPass;
+  /** Non-null only in pixel mode; the classic pass owns the PNG atlas. */
+  private pixelUnitPass: PixelUnitPass | null = null;
   private namePass: NamePass;
   private fxPass: FxPass;
   private rangeCirclePass: RangeCirclePass;
@@ -587,14 +590,25 @@ export class GPURenderer {
       );
     }
     this.structureLevelPass = new StructureLevelPass(gl, header, this.settings);
-    this.unitPass = new UnitPass(
-      gl,
-      header,
-      this.paletteTex,
-      this.effectTex,
-      this.settings,
-      config,
-    );
+    if (parsePixelStyle().includes("units")) {
+      this.pixelUnitPass = new PixelUnitPass(
+        gl,
+        header,
+        this.paletteData,
+        this.settings,
+        config,
+      );
+      this.unitPass = this.pixelUnitPass;
+    } else {
+      this.unitPass = new UnitPass(
+        gl,
+        header,
+        this.paletteTex,
+        this.effectTex,
+        this.settings,
+        config,
+      );
+    }
     this.namePass = new NamePass(
       gl,
       header,
@@ -759,6 +773,8 @@ export class GPURenderer {
     this.namePass.refreshPlayerColors(this.paletteData);
     // Pixel structures resolve P/B/C from the sprite palette texture
     this.pixelStructurePass?.refreshPalette(this.paletteData);
+    // Pixel units resolve P/B/C the same way
+    this.pixelUnitPass?.refreshPalette(this.paletteData);
   }
 
   /** Re-upload the per-player effect texture (style + colors by smallID). */
@@ -1383,7 +1399,7 @@ export class GPURenderer {
     this.spawnOverlayPass.draw(cam);
     if (pe.borderStamp) this.borderStampPass.draw(cam);
     if (pe.railroad) this.railroadPass.draw(cam, zoom);
-    if (pe.unit) this.unitPass.drawGround(cam);
+    if (pe.unit) this.unitPass.drawGround(cam, zoom);
     if (pe.falloutBloom) this.bloomPass.draw(cam, this.frameTick);
     this.samRadiusPass.draw(cam);
     this.rangeCirclePass.draw(cam);
@@ -1402,7 +1418,7 @@ export class GPURenderer {
     // Spiral vortexes sit above the plain trails, below the missiles that
     // trail them. Skipped in alt view — the strategic overlay stays effects-free.
     if (!this.altView) this.spiralRibbonPass.draw(cam);
-    if (pe.unit) this.unitPass.drawMissiles(cam);
+    if (pe.unit) this.unitPass.drawMissiles(cam, zoom);
 
     if (pe.fx) {
       this.fxPass.tick();

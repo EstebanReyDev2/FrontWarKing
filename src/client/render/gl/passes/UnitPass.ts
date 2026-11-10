@@ -627,8 +627,9 @@ export class UnitPass {
     gl.bindTexture(gl.TEXTURE_2D, this.effectTex);
   }
 
-  /** Draw ground/sea units (boats, trains). Render below structures. */
-  drawGround(cameraMatrix: Float32Array): void {
+  /** Draw ground/sea units (boats, trains). Render below structures.
+   *  `_zoom` is only used by the pixel pass; the classic sprites are PNGs. */
+  drawGround(cameraMatrix: Float32Array, _zoom?: number): void {
     if (this.groundCount === 0) return;
     this.bindProgram(cameraMatrix);
     const gl = this.gl;
@@ -636,8 +637,9 @@ export class UnitPass {
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.groundCount);
   }
 
-  /** Draw missiles/projectiles (nukes, shells, SAM, MIRV warheads). Render above structures. */
-  drawMissiles(cameraMatrix: Float32Array): void {
+  /** Draw missiles/projectiles (nukes, shells, SAM, MIRV warheads). Render above structures.
+   *  `_zoom` is only used by the pixel pass; the classic sprites are PNGs. */
+  drawMissiles(cameraMatrix: Float32Array, _zoom?: number): void {
     if (this.missileCount === 0) return;
     this.applyMissileSmoothing();
     this.bindProgram(cameraMatrix);

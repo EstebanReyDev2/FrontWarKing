@@ -244,3 +244,131 @@ la URL queda `.../game/<id>?live&pixel=off` y
 `?live&pixel=all` y `PixelStructurePass`. Test de regresión en
 `tests/client/render/pixel/PixelStyle.test.ts` (reescribe la URL después de
 cargar el módulo y comprueba que el flag sobrevive).
+
+## 9. F3c — Unidades con sprites (2026-11-10)
+
+### 9.1 Método
+
+Misma máquina, navegador y ventana que la baseline (§1). Viewport real
+**800×574** con DPR 1, así que la comparación válida sigue siendo contra la
+tabla §4.2.
+
+Escenario: singleplayer Europe, 1 humano + 20 bots, 95 jugadores en total,
+aparición aleatoria, sin modificadores. A diferencia de §8 no alcanza con el
+estado inicial: las unidades aparecen y se mueven con el correr de la partida.
+Se dejó correr ~6 minutos y recién entonces se midió, con el jugador humano ya
+muerto y la sesión en modo espectador. Eso deja **~510 unidades vivas** (luego
+~650 al seguir creciendo). En el reparto por slot de esa escena: 354 mercantes,
+25 vagones, 13 transportes, 10 locomotoras y 3 acorazados.
+
+Cámara: centrada sobre la primera instancia del `groundBuf` del propio pase,
+usando la misma fórmula que `syncCamera` en `ClientGameRunner.ts`
+(`offsetX = x - mapWidth/2 - (canvasW - mapWidth)/(2*scale)`, idéntico en Y) para
+que `TransformHandler` y el renderer coincidan. No se usó `goTo` porque su
+suavizado tarda varios segundos y la escena cambia mientras tanto.
+
+Instrumentación idéntica a §3: deltas de `requestAnimationFrame` y parche de
+`WebGL2RenderingContext.prototype` para `drawArrays`, `drawElements`,
+`drawArraysInstanced`, `drawElementsInstanced` y `drawRangeElements`, contando
+por frame. Ventanas de 3 s (≈180 frames) por fila.
+
+### 9.2 Costo del pase
+
+Primero la medición directa, envolviendo los dos métodos de dibujo del pase y
+contando los draw calls GL emitidos dentro de cada uno (31 frames):
+
+| Método del pase | Draw calls por frame |
+| --- | --- |
+| `drawGround` | 1 (siempre) |
+| `drawMissiles` | 1 (siempre) |
+| **Total** | **2** |
+
+Es exactamente lo que emite `UnitPass` clásico, que también dibuja en dos
+llamadas instanciadas (una de unidades de tierra, una de proyectiles). El pase
+pixel **reemplaza** al clásico, no se suma: `Renderer` asigna
+`this.unitPass = this.pixelUnitPass`, y sólo uno de los dos existe.
+
+### 9.3 Corrida A/B
+
+Corrida A: `?pixel=units` (`PixelUnitPass`). Corrida B: la misma partida y el
+mismo frame con `drawGround`/`drawMissiles` reemplazados por no-ops, que aísla
+el costo del pase sin cambiar la escena.
+
+| Zoom | Pase de unidades | Zoom real | FPS | Frame time prom. | p95 | Máx. | Draw calls/frame |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 4 | pixel | 4.000 | 60.0 | 16.66 ms | 16.9 ms | 17.1 ms | 20.7 |
+| 1 | pixel | 1.000 | 60.0 | 16.67 ms | 16.8 ms | 16.9 ms | 19.0 |
+| 0.5 | pixel | 0.500 | 60.0 | 16.67 ms | 16.8 ms | 17.5 ms | 18.7 |
+| 0.2 | pixel | 0.200 | 60.0 | 16.67 ms | 16.9 ms | 16.9 ms | 18.9 |
+| 1 | sin pase | 1.000 | 60.0 | 16.67 ms | 16.9 ms | 17.0 ms | 18.8 |
+
+La banda 18.7–20.7 queda por encima de los 15.7–17.7 de §4.2, pero esa
+diferencia **no es del pase**: la fila A/B de zoom 1, medida sobre el mismo
+frame, da 19.0 con el pase y 18.8 sin él. El resto del desvío lo explica el
+estado de la partida —~510 unidades, 6 minutos de juego y las pasadas de
+estelas, barras y nombres activas—, que es justo lo que advierte §5: una
+diferencia de ±2 sin cambio de código no es una regresión. Los draw calls
+además varían solos entre frames (19–21 en la primera corrida).
+
+### 9.4 LOD y capturas
+
+El LOD se decide en el vertex shader con
+`spritePx = uUnitSize * uZoom` (`uUnitSize = 16`), en píxeles de dispositivo:
+por debajo de 4 px se dibuja un bloque sólido del color del jugador (2×2 si
+`spritePx < 2`, 4×4 si no) en vez del sprite. Con DPR 1 eso corta en zoom 0.25.
+
+Capturas en la partida real (`?pixel=units`), cámara centrada en un grupo de
+unidades:
+
+| Zoom | Sprite en pantalla | Qué se ve |
+| --- | --- | --- |
+| 4 | 64 px | sprites 16×16 nítidos, un texel de arte = 4 px de pantalla. Se distinguen mercantes (vela romboidal) y transportes (casco). |
+| 1 | 16 px | un texel de arte = 1 px de pantalla, el caso de nitidez exacta. Sprites legibles en todo el ancho del mapa. |
+| 0.5 | 8 px | sprites de 8 px: siguen siendo sprites, se leen como siluetas de color. |
+| 0.2 | 3.2 px | LOD activo: bloques sólidos de 2×2 del color del jugador, sin atlas. |
+
+Verificado además por diferencia: con `drawGround`/`drawMissiles` en no-op los
+sprites desaparecen y el mapa queda sin unidades, o sea que lo que se ve en las
+capturas sale del pase pixel y no de una pasada residual.
+
+Las capturas se guardaron fuera del repo (evidencia de la corrida, no assets):
+`%TEMP%\opencode-browser-*\0\screenshot.jpeg`. No se versionan para no romper la
+regla de "cero archivos de imagen nuevos".
+
+### 9.5 Memoria de texturas
+
+| Recurso | Formato | Tamaño |
+| --- | --- | --- |
+| Atlas de unidades (12 sprites, 256×256) | R8UI (1 B/px) | 64 KB |
+| Paleta de sprites (16×4096) | RGBA8 (4 B/px) | 0.25 MB |
+| **Total F3c** | | **0.31 MB** |
+
+0.17 % de los 183.1 MB de la baseline. El atlas es de 256×256 porque los 12
+sprites son 16×16 salvo `nuke` (32×32) y `buildAtlas` empaqueta en una grilla
+potencia de dos; no hay atlas PNG ni textura por jugador. Con `?pixel=all`
+conviven `PixelStructurePass` y `PixelUnitPass` y cada uno arma su propia
+paleta, así que ahí la paleta se duplica (+0.25 MB). Es despreciable, pero queda
+anotado por si F3e quiere compartirla.
+
+### 9.6 Veredicto
+
+| Métrica | Aprobado | Medido | Resultado |
+| --- | --- | --- | --- |
+| FPS promedio | ≥ 55 en los zooms medidos | 60.0 | ✅ |
+| Frame time p95 | ≤ 20 ms | 16.9 ms | ✅ |
+| Frame time máximo | ≤ 50 ms | 17.5 ms | ✅ |
+| Draw calls | ≤ baseline + 1 | 2 por frame, igual que el clásico | ✅ |
+| Memoria de texturas | no aumentar | +0.31 MB (0.17 %) | ✅ |
+
+### 9.7 Bug encontrado: el shader no compilaba en ANGLE
+
+La primera corrida en el navegador terminó en `¡Error de conexión!` con
+`Shader compile error [PixelUnitPass fragment, GPU: ANGLE (Intel, Intel(R)
+Iris(R) Xe Graphics ... Direct3D11)]: ERROR: 0:107: ')' : syntax error`.
+
+Causa: una coma final en los argumentos de `clamp(...)` en
+`pixel-unit.frag.glsl`. El driver de ANGLE no acepta la coma antes del paréntesis
+de cierre aunque GLSL ES 3.00 la tolere en otras posiciones. Se quitó la coma y
+el pase compila. Vale como recordatorio: los tests de CPU no tocan la
+compilación de shaders, así que un pase nuevo necesita una corrida real en el
+navegador antes de darse por cerrado.
