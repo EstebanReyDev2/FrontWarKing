@@ -93,6 +93,20 @@ describe("UsernameInput Steam seeding", () => {
   });
 });
 
+describe("UsernameInput legacy clan tag", () => {
+  it("ignores a clanTag left in localStorage", async () => {
+    localStorage.setItem("username", "Player");
+    localStorage.setItem("clanTag", "OLD");
+    const el = new UsernameInput();
+    el.connectedCallback();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(el.getUsername()).toBe("Player");
+    expect(el.canPlay()).toBe(true);
+    expect(localStorage.getItem("clanTag")).toBe("OLD");
+  });
+});
+
 describe("UsernameInput Steam reseeding", () => {
   function mountWithPersona(name: string): UsernameInput {
     vi.spyOn(steamSDK, "isOnSteam").mockReturnValue(true);
@@ -213,28 +227,5 @@ describe("UsernameInput Steam reseeding", () => {
 
     expect(getUser).not.toHaveBeenCalled();
     expect(el.getUsername()).toBe("AnonAnchor");
-  });
-});
-
-describe("UsernameInput clan selection", () => {
-  it("clears the selected clan when it matches the rejected tag", () => {
-    const el = new UsernameInput();
-    Object.assign(el, { baseUsername: "Player", clanTag: "ALLY" });
-    localStorage.setItem("username", "Player");
-    localStorage.setItem("clanTag", "ALLY");
-
-    el.clearClanTag("ally");
-
-    expect(el.getClanTag()).toBeNull();
-    expect(localStorage.getItem("clanTag")).toBe("");
-  });
-
-  it("preserves a newer clan selection", () => {
-    const el = new UsernameInput();
-    Object.assign(el, { baseUsername: "Player", clanTag: "BETA" });
-
-    el.clearClanTag("ALLY");
-
-    expect(el.getClanTag()).toBe("BETA");
   });
 });

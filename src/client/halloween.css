@@ -203,9 +203,9 @@ body.halloween-theme:not(.in-game)
   color: #ffffff !important;
 }
 
-/* Modals & Panels (clean, flush outer border without orange edge; excludes clan tag dropdown & in-game HUD) */
+/* Modals & Panels (clean, flush outer border without orange edge; excludes in-game HUD) */
 body.halloween-theme:not(.in-game) .page-content > div,
-body.halloween-theme:not(.in-game) [role="dialog"]:not(#clan-tag-menu) > div {
+body.halloween-theme:not(.in-game) [role="dialog"] > div {
   background-color: var(--hw-purple-translucent) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.8) !important;
 }
@@ -250,7 +250,7 @@ body.halloween-theme:not(.in-game) button.bg-malibu-blue:disabled {
   box-shadow: none !important;
 }
 
-/* Secondary Action Buttons - Create Lobby, Ranked, Join Lobby
+/* Secondary Action Buttons - Create Lobby, Join Lobby
    Scoped strictly to .grid-cols-3 so map cards (which also use button.bg-surface) keep their native #0a1628 water color! */
 body.halloween-theme:not(.in-game)
   game-mode-selector
@@ -366,9 +366,8 @@ body.halloween-theme:not(.in-game)
   }
 }
 
-/* --- News Banner & Streaming Now (Homepage) --- */
-body.halloween-theme:not(.in-game) news-box > div,
-body.halloween-theme:not(.in-game) streaming-now > div {
+/* --- News Banner (Homepage) --- */
+body.halloween-theme:not(.in-game) news-box > div {
   background-color: var(--hw-purple-translucent) !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur(8px) !important;
@@ -376,11 +375,7 @@ body.halloween-theme:not(.in-game) streaming-now > div {
 
 body.halloween-theme:not(.in-game) news-box a:hover,
 body.halloween-theme:not(.in-game) news-box .text-xs a,
-body.halloween-theme:not(.in-game) news-modal a,
-body.halloween-theme:not(.in-game)
-  streaming-now
-  a:hover
-  .group-hover\:text-blue-300 {
+body.halloween-theme:not(.in-game) news-modal a {
   color: var(--hw-orange) !important;
 }
 

@@ -1,16 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-// The desktop bridge is absent in jsdom; mock it like HostLobbyModal.test.ts.
-vi.mock("../../src/client/DesktopPresence", () => ({
-  desktopPresence: {
-    isAvailable: vi.fn(() => false),
-    openInviteDialog: vi.fn(async () => true),
-    set: vi.fn(),
-    consumePendingInvite: vi.fn(async () => null),
-    subscribeInvites: vi.fn(() => () => undefined),
-  },
-}));
-
 import { LobbyInfoEvent } from "@openfront/shared/WireSchemas";
 import { HostLobbyModal } from "../../src/client/HostLobbyModal";
 

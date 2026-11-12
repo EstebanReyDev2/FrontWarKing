@@ -1,17 +1,17 @@
 // What, if anything, interrupts the player on a clean boot — decided in one
 // place, as data.
 //
-// Four things independently wanted the main menu the moment /users/@me landed:
-// the TEMPORARY#### rename prompt, the unclaimed-name prompt this module adds,
-// the reservation lapse notice, and the unclaimed-rewards popup. Main.ts
-// resolved the first two against each other with a bare `return` and the third
-// did not participate at all — it fires from inside <username-input>, on its
-// own listener, and neither side could see the other. Two overlays on one boot
-// was a matter of which states happened not to co-occur.
+// Several things independently wanted the main menu the moment /users/@me
+// landed: the TEMPORARY#### rename prompt, the unclaimed-name prompt this
+// module adds, and the reservation lapse notice. Main.ts resolved the first two
+// against each other with a bare `return` and the lapse notice did not
+// participate at all — it fires from inside <username-input>, on its own
+// listener, and neither side could see the other. Two overlays on one boot was
+// a matter of which states happened not to co-occur.
 //
 // So: one ordered rule, expressed over plain values. Main.ts asks once and acts
 // on the answer, which makes the ordering testable without a DOM and leaves one
-// place to add the fifth contender.
+// place to add the next contender.
 
 import {
   isTemporaryUsername,
@@ -19,21 +19,12 @@ import {
 } from "@openfront/shared/ApiSchemas";
 import type { DesktopUpdateState } from "./DesktopShell";
 import { lapseNoticeDue } from "./PlayerName";
-import {
-  steamGrantEndedShown,
-  steamGrantWelcomed,
-  type SteamGrantRecord,
-  type SteamGrantStore,
-} from "./SteamGrantNotices";
 
 /** Every boot-time interrupt, in the order they win. */
 export type BootInterrupt =
   | "username-temporary"
-  | "grant-welcome"
   | "username-claim"
-  | "lapse-notice"
-  | "grant-ended"
-  | "rewards";
+  | "lapse-notice";
 
 export interface BootInterruptInputs {
   /**
@@ -51,21 +42,6 @@ export interface BootInterruptInputs {
   usernameBase: string | null | undefined;
   /** lapseNoticeDue(userMe, storedMarker) — see PlayerName.ts. */
   lapseNoticeDue: boolean;
-  /** steamGrantWelcomeDue(...) — a running Steam month nobody has explained. */
-  grantWelcomeDue: boolean;
-  /** steamGrantEndedDue(...) — a Steam month that ran out unannounced. */
-  grantEndedDue: boolean;
-  /**
-   * steamGrantStringsReady(...) — same precondition as claimStringsReady, for
-   * the two grant notices. Failing it lets the next interrupt take the boot.
-   */
-  grantStringsReady: boolean;
-  /**
-   * How many of the account's unclaimed rewards can be claimed now
-   * (isRewardClaimable): held ones don't count, since on their own they'd
-   * open the popup every boot with nothing to do.
-   */
-  rewardCount: number;
   /** claimPromptDue(...) — the decay rule below. */
   claimPromptDue: boolean;
   /**
@@ -85,10 +61,10 @@ export interface BootInterruptInputs {
  * desktop shell serves the renderer from its own privileged scheme at
  * `app://openfront/index.html` (openfront-desktop src/main/protocol.ts,
  * GAME_URL), so the pathname there is ALWAYS "/index.html" and a bare "/" test
- * is never true. That is not new — the TEMPORARY#### rename prompt and the
- * unclaimed-rewards popup have both been dead on Steam for the same reason —
- * but the claim prompt is aimed squarely at Steam buyers, so it would have
- * shipped never having fired for the population it exists for.
+ * is never true. That is not new — the TEMPORARY#### rename prompt has been
+ * dead on Steam for the same reason — but the claim prompt is aimed squarely
+ * at Steam buyers, so it would have shipped never having fired for the
+ * population it exists for.
  *
  * Gated on the shell rather than accepted everywhere: on the web "/index.html"
  * is reachable directly and is not the homepage, and widening the rule there
@@ -214,29 +190,16 @@ function entitled(status: string | undefined): boolean {
  * 1. `username-temporary` — the server has already renamed them. They are
  *    playing under a name that is not theirs right now, and the rename back is
  *    free only until they spend it. Most urgent, and it was already first.
- * 2. `grant-welcome` — a Steam month is running and nobody has said what it
- *    is. Ahead of the claim prompt because the claim prompt asks the buyer to
- *    use a perk of a thing they have not yet been told they own; a player who
- *    does not know the month is a one-off reads every later prompt as a
- *    subscription they never agreed to. It fires once per grant.
- * 3. `username-claim` — entitled, no name at all. The perk is running down
+ * 2. `username-claim` — entitled, no name at all. The perk is running down
  *    unused and nothing else in the client will ever mention it, which is the
  *    whole reason this prompt exists.
- * 4. `lapse-notice` — a name they already hold is running out. Below the
+ * 3. `lapse-notice` — a name they already hold is running out. Below the
  *    above only because it repeats: it re-arms on the phase change and speaks
  *    again next launch, whereas the claim prompt decays and stops. It has
- *    already spoken by the time this is asked (see lapseShownAfterDispatch),
- *    which is why the grant sign-off cannot rank above it and instead the
- *    notice itself carries the after-grant wording for a former grant holder.
- * 5. `grant-ended` — the Steam month ran out and nothing said so. Nothing is
- *    at risk, but every day it goes unsaid is a day the player believes they
- *    are about to be charged. Marks itself shown when the lapse notice covers
- *    it, so a former grant holder with a reserved name hears it once.
- * 6. `rewards` — money already in the account. Nothing is at risk and it
- *    survives to the next load unchanged, so it always yields.
+ *    already spoken by the time this is asked (see lapseShownAfterDispatch).
  *
- * 1 and 3 are mutually exclusive by state (a TEMPORARY#### rename IS a name),
- * as are 3 and 4 (`premium` versus `claimed`). The order is stated anyway
+ * 1 and 2 are mutually exclusive by state (a TEMPORARY#### rename IS a name),
+ * as are 2 and 3 (`premium` versus `claimed`). The order is stated anyway
  * rather than resting on that staying true — those exclusions are properties of
  * today's server, not of this rule.
  */
@@ -251,14 +214,11 @@ export function nextBootInterrupt(
   )
     return "username-temporary";
 
-  if (inputs.grantWelcomeDue && inputs.grantStringsReady)
-    return "grant-welcome";
-
-  // `username === null` is the whole population: a day-0 buyer is entitled
-  // from the moment the grant lands and has never opened the account modal,
-  // which is the only place a name can be claimed. Note this is the DISPLAY
-  // name — a player who claimed and fell back to `base.####` has one, so they
-  // are not prompted; they were told about the fallback when it happened.
+  // `username === null` is the whole population: an entitled player who has
+  // never opened the account modal has no name, and that modal is the only
+  // place a name can be claimed. Note this is the DISPLAY name — a player who
+  // claimed and fell back to `base.####` has one, so they are not prompted;
+  // they were told about the fallback when it happened.
   if (
     entitled(inputs.usernameStatus) &&
     !inputs.username &&
@@ -268,10 +228,6 @@ export function nextBootInterrupt(
     return "username-claim";
 
   if (inputs.lapseNoticeDue) return "lapse-notice";
-
-  if (inputs.grantEndedDue && inputs.grantStringsReady) return "grant-ended";
-
-  if (inputs.rewardCount > 0) return "rewards";
 
   return null;
 }
@@ -419,10 +375,6 @@ export const BOOT_INTERRUPT_KEYS = {
   claimBody: "account_modal.username_claim_prompt",
   claimHeading: "account_modal.username_claim_heading",
   claimConfirm: "account_modal.username_claim_prompt_confirm",
-  grantWelcomeBody: "steam_grant.welcome_body",
-  grantWelcomeHeading: "steam_grant.welcome_heading",
-  grantEndedBody: "steam_grant.ended_body",
-  grantEndedHeading: "steam_grant.ended_heading",
 } as const;
 
 /** Where the username form lives. */
@@ -439,10 +391,9 @@ export const USERNAME_FORM_HASH = "modal=change-username";
  *
  * A precondition on the interrupt, not a bail inside it. Answering "not yet"
  * from inside runBootInterrupt would silently cost the boot: the claim prompt
- * has already won the ranking by then, so nothing else gets a turn and an
- * entitled player holding unclaimed rewards would see neither — where main
- * would simply have opened the rewards popup. Asked here, the claim prompt is
- * never chosen and rewards takes the boot by the ordinary ordering.
+ * has already won the ranking by then, so nothing else gets a turn, and the
+ * player would never see the prompt on that launch. Asked here, the claim
+ * prompt is never chosen and the next-ranked interrupt takes the boot.
  *
  * Only ever false off English, which is a static import.
  */
@@ -460,27 +411,6 @@ export function claimPromptStringsReady(
 }
 
 /**
- * The same precondition for the two Steam grant notices. Each is one-shot and
- * records itself shown before opening, so a key echoed back would spend the
- * only explanation a buyer ever gets on a string nobody can read.
- */
-export function steamGrantStringsReady(
-  translate: (key: string, params: Record<string, string>) => string,
-): boolean {
-  // The bodies take {tier} and {date}; formatting them without those fails
-  // and logs an ICU error on every boot. Only key !== result matters here.
-  const params = { tier: "", date: "" };
-  return (
-    [
-      BOOT_INTERRUPT_KEYS.grantWelcomeBody,
-      BOOT_INTERRUPT_KEYS.grantWelcomeHeading,
-      BOOT_INTERRUPT_KEYS.grantEndedBody,
-      BOOT_INTERRUPT_KEYS.grantEndedHeading,
-    ] as string[]
-  ).every((key) => translate(key, params) !== key);
-}
-
-/**
  * Everything acting on an interrupt has to reach outside itself for. Passed in
  * rather than imported so the wiring below is exercised by tests instead of
  * being trusted — the ordering was already pure, but which dialog opens, what
@@ -494,39 +424,16 @@ export interface BootInterruptPorts {
   confirm(body: string, heading: string, confirmText: string): Promise<boolean>;
   /** Opens a close-only dialog; resolves when dismissed. */
   alert(body: string, heading: string): Promise<void>;
-  /** The display name of a subscription tier id (translateCosmetic). */
-  tierName(tier: string): string;
   /** Sets window.location.hash. */
   navigate(hash: string): void;
-  /** Opens the unclaimed-rewards popup. */
-  openRewards(): void;
   /** Persists the whole claim-prompt map. */
   storeClaimPrompt(store: ClaimPromptStore): void;
-  /**
-   * Applies `update` to the Steam grant notice map as currently stored. Read at
-   * write time, not from the context: the write lands after the dialog, and
-   * onUserMe and the lapse notice can rewrite the map while it is open.
-   */
-  updateSteamGrant(update: (store: SteamGrantStore) => SteamGrantStore): void;
-  /** POST /users/@me/notices. Fire and forget. */
-  markNoticeSeen(notice: string): void;
   now(): number;
 }
 
 export interface BootInterruptContext {
   claimStore: ClaimPromptStore;
-  grantStore: SteamGrantStore;
   publicId: string;
-}
-
-// The panel's own date format, so the dialog and the account panel agree on
-// what day the month ends.
-function formatGrantDate(iso: string | Date): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 /**
@@ -570,22 +477,6 @@ async function whileDialogOpen<T>(open: () => Promise<T>): Promise<T> {
   }
 }
 
-// Marks only the grant the dialog spoke about. recordSteamGrant replaces the
-// record when the period or tier changes, and a grant that arrived while the
-// dialog was open is still owed its own notice.
-function forShownGrant(
-  shown: SteamGrantRecord,
-  publicId: string,
-  mark: (store: SteamGrantStore, publicId: string) => SteamGrantStore,
-): (store: SteamGrantStore) => SteamGrantStore {
-  return (store) => {
-    const current = store[publicId];
-    return current?.periodEnd === shown.periodEnd && current.tier === shown.tier
-      ? mark(store, publicId)
-      : store;
-  };
-}
-
 async function runInterrupt(
   interrupt: BootInterrupt | null,
   context: BootInterruptContext,
@@ -605,7 +496,7 @@ async function runInterrupt(
       // Readiness of these strings is a precondition on the interrupt, checked
       // by claimPromptStringsReady before the ranking picks it — not a bail
       // here. Bailing here would consume the boot and leave an entitled player
-      // with unclaimed rewards seeing neither.
+      // without the prompt on that launch.
       const body = ports.translate(BOOT_INTERRUPT_KEYS.claimBody);
       const heading = ports.translate(BOOT_INTERRUPT_KEYS.claimHeading);
       const confirmText = ports.translate(BOOT_INTERRUPT_KEYS.claimConfirm);
@@ -618,39 +509,7 @@ async function runInterrupt(
       if (accepted) ports.navigate(USERNAME_FORM_HASH);
       return;
     }
-    case "grant-welcome": {
-      const record = context.grantStore[context.publicId];
-      if (record === undefined) return;
-      const tier = ports.tierName(record.tier);
-      await ports.alert(
-        ports.translate(BOOT_INTERRUPT_KEYS.grantWelcomeBody, {
-          tier,
-          date: formatGrantDate(record.periodEnd),
-        }),
-        ports.translate(BOOT_INTERRUPT_KEYS.grantWelcomeHeading),
-      );
-      ports.updateSteamGrant(
-        forShownGrant(record, context.publicId, steamGrantWelcomed),
-      );
-      return;
-    }
-    case "grant-ended": {
-      const record = context.grantStore[context.publicId];
-      if (record === undefined) return;
-      const tier = ports.tierName(record.tier);
-      await ports.alert(
-        ports.translate(BOOT_INTERRUPT_KEYS.grantEndedBody, { tier }),
-        ports.translate(BOOT_INTERRUPT_KEYS.grantEndedHeading),
-      );
-      ports.updateSteamGrant(
-        forShownGrant(record, context.publicId, steamGrantEndedShown),
-      );
-      return;
-    }
     case "lapse-notice":
-      return;
-    case "rewards":
-      ports.openRewards();
       return;
     case null:
       return;

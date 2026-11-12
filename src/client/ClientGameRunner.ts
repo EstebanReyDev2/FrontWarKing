@@ -20,10 +20,10 @@ import { GameMapLoader } from "@openfront/shared/GameMapLoader";
 import { replacer } from "@openfront/shared/SharedUtil";
 import {
   GameRecord,
-  GroupTokenEvent,
   LobbyInfoEvent,
   PlayerCosmeticRefs,
   ServerMessage,
+  ServerStartGameMessage,
   WireGameStartInfo,
 } from "@openfront/shared/WireSchemas";
 import { ClientEnv } from "../client/ClientEnv";
@@ -48,9 +48,10 @@ import {
   TickMetricsEvent,
   ToggleRenderDebugGuiEvent,
 } from "./InputHandler";
-import { rememberLobbyRoster } from "./LobbyRosterLevels";
+
+import type { RealtimeTransport } from "./netcode/RealtimeTransport";
+import type { TurnClock } from "./netcode/TurnClock";
 import { pagePin } from "./PagePin";
-import { groupTokenOf, loggableStartMessage } from "./PresenceGroup";
 import {
   applyGraphicsOverrides,
   createRenderSettings,
@@ -99,13 +100,21 @@ import { GameView, PlayerView } from "./view";
 import { WebGLFrameBuilder } from "./WebGLFrameBuilder";
 import { WorkerClient } from "./WorkerClient";
 
+// The start message as it is safe to log: everything except the grouping token.
+// Players paste consoles into bug reports, and the token must not travel that
+// way.
+function loggableStartMessage(
+  message: ServerStartGameMessage,
+): Record<string, unknown> {
+  const loggable: Record<string, unknown> = { ...message };
+  delete loggable.groupToken;
+  return loggable;
+}
+
 export interface LobbyConfig {
   cosmetics: PlayerCosmeticRefs;
   playerName: string;
   playerClanTag: string | null;
-  // In-flight clan-tag ownership check; resolves to the tag to submit (null if
-  // it failed). Runs parallel to the WS handshake — only the join waits on it.
-  clanTagCheck?: Promise<string | null>;
   playerRole: string | null;
   gameID: GameID;
   turnstileToken: string | null;
@@ -120,6 +129,18 @@ export interface LobbyConfig {
   // Host only: the play token the lobby was created under, used for the
   // first join so the host joins as the creator (see createLobby).
   creatorToken?: string;
+  // The Phase 2 realtime path. It is opt-in so singleplayer, replays and the
+  // existing WebSocket lobbies keep their current behaviour.
+  realtime?: {
+    clientID: string;
+    hostID: string;
+    transport?: RealtimeTransport;
+    allowGeneralHello?: boolean;
+    term?: number;
+    // Tests inject a manual clock; production leaves it undefined and gets
+    // WorkerTurnClock.
+    clock?: TurnClock;
+  };
 }
 
 export interface JoinLobbyResult {
@@ -151,10 +172,6 @@ export function joinLobby(
   let currentGameRunner: ClientGameRunner | null = null;
 
   const onconnect = async () => {
-    // Drop the tag if the ownership check failed; the server re-checks anyway.
-    if (lobbyConfig.clanTagCheck !== undefined) {
-      lobbyConfig.playerClanTag = await lobbyConfig.clanTagCheck;
-    }
     // Always send join - server will detect reconnection via persistentID
     console.log(`Joining game lobby ${lobbyConfig.gameID}`);
     transport.joinGame();
@@ -215,22 +232,10 @@ export function joinLobby(
   };
 
   const onmessage = (message: ServerMessage) => {
-    // Before the per-type handling below: the token rides two different
-    // messages and the listener does not care which one delivered it.
-    const groupToken = groupTokenOf(message);
-    if (groupToken !== undefined) {
-      eventBus.emit(new GroupTokenEvent(groupToken));
-    }
     if (message.type === "lobby_info") {
       // Server tells us our assigned clientID
       clientID = message.myClientID;
       eventBus.emit(new LobbyInfoEvent(message.lobby, message.myClientID));
-      // Kept past game start for the in-game level badges.
-      rememberLobbyRoster(
-        message.lobby.gameID,
-        message.lobby.clients,
-        message.myClientID,
-      );
       // Preload the map while still in the lobby so game start can reuse the
       // cached result instead of blocking on the download in the short
       // prestart->start window. The preload is debounced: it only fires once
@@ -345,13 +350,10 @@ export function joinLobby(
           );
         });
       } else if (message.error === "kick_reason.match_cancelled") {
-        // A matched player never connected and the server cancelled the game
-        // pre-start. Tear down the dead lobby, then put the matchmaking
-        // modal — still open on "waiting for game" (it only closes at
-        // prestart) — straight back into the queue so the players who did
-        // connect don't have to requeue by hand. A non-blocking toast
-        // explains why; an alert here would keep them out of the queue
-        // until dismissed.
+        // A player never connected and the server cancelled the game
+        // pre-start. Tear down the dead lobby and explain why with a
+        // non-blocking toast; there is no matchmaking queue to rejoin any
+        // more.
         document.dispatchEvent(
           new CustomEvent("leave-lobby", {
             detail: { lobby: lobbyConfig.gameID, cause: "match-cancelled" },
@@ -359,7 +361,6 @@ export function joinLobby(
             composed: true,
           }),
         );
-        document.dispatchEvent(new CustomEvent("matchmaking-requeue"));
         window.dispatchEvent(
           new CustomEvent("show-message", {
             detail: {

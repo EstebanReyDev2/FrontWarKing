@@ -42,7 +42,7 @@ export class DifficultyInfo extends LitElement {
         ? translateText("difficulty.info_troops_same")
         : translateText("difficulty.info_troops", { percent });
 
-    // Same strip/bubble layout as <cosmetic-info>: the strip spans the card so
+    // Same strip/bubble layout: the strip spans the card so
     // the bubble (right-aligned under the "?") is capped at the card's width
     // and wraps, instead of running past the modal edge and getting clipped.
     // It also stays outside the card's own button, which may not nest a control.

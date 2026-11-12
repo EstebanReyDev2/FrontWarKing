@@ -27,7 +27,19 @@ import {
 // TerrainPass
 // ---------------------------------------------------------------------------
 
-export class TerrainPass {
+/**
+ * Common surface of the classic baked terrain pass and the procedural pixel
+ * pass. The Renderer picks one at construction and nothing downstream branches
+ * on the style.
+ */
+export interface TerrainRenderer {
+  draw(cameraMatrix: Float32Array, zoom: number): void;
+  applyTerrainRects(rects: readonly TerrainRect[], bytes: Uint8Array): void;
+  setTerrainColors(colors?: TerrainColorOverrides): void;
+  dispose(): void;
+}
+
+export class TerrainPass implements TerrainRenderer {
   private program: WebGLProgram;
   private tex: WebGLTexture;
   private vao: WebGLVertexArrayObject;
@@ -146,8 +158,12 @@ export class TerrainPass {
     }
   }
 
-  /** Render the terrain. Call with depth test disabled, no blending. */
-  draw(cameraMatrix: Float32Array): void {
+  /**
+   * Render the terrain. Call with depth test disabled, no blending.
+   * `zoom` is unused by the baked path; it exists so the classic and pixel
+   * passes share one interface.
+   */
+  draw(cameraMatrix: Float32Array, _zoom = 1): void {
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.uniformMatrix3fv(this.uCamera, false, cameraMatrix);

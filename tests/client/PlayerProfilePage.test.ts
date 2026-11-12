@@ -10,7 +10,6 @@ import {
 } from "vitest";
 
 const fetchPublicPlayerProfileMock = vi.hoisted(() => vi.fn());
-const viewer = vi.hoisted(() => ({ kind: "unknown" as string }));
 
 vi.mock("../../src/client/Utils", () => ({
   translateText: vi.fn((key: string) => key),
@@ -24,14 +23,6 @@ vi.mock("../../src/client/Api", () => ({
     results: [],
     nextCursor: null,
   })),
-}));
-
-vi.mock("../../src/client/ProgressionApi", () => ({
-  fetchPublicPlayerProgress: vi.fn(async () => false),
-}));
-
-vi.mock("../../src/client/ProgressionAccount", () => ({
-  resolveXpAccount: vi.fn(async () => ({ kind: viewer.kind })),
 }));
 
 vi.mock(
@@ -64,14 +55,11 @@ const profile = {
   createdAt: "2026-01-01T00:00:00.000Z",
   username: "Wonder",
   stats: { Public: {} },
-  clans: [],
 };
 
 describe("public profile page", () => {
   let modal: PlayerProfileModal;
   let playPage: HTMLElement;
-  let leaderboard: HTMLElement & { open: () => void };
-  let leaderboardOpens: number;
 
   async function settle(assertion: () => void): Promise<void> {
     await vi.waitFor(async () => {
@@ -118,17 +106,7 @@ describe("public profile page", () => {
   beforeEach(async () => {
     fetchPublicPlayerProfileMock.mockReset();
     fetchPublicPlayerProfileMock.mockResolvedValue(profile);
-    viewer.kind = "unknown";
     history.replaceState(null, "", "/");
-
-    leaderboardOpens = 0;
-    leaderboard = document.createElement("leaderboard-modal") as HTMLElement & {
-      open: () => void;
-    };
-    leaderboard.open = () => {
-      leaderboardOpens++;
-    };
-    document.body.appendChild(leaderboard);
 
     modal = document.createElement(
       "player-profile-modal",
@@ -143,7 +121,6 @@ describe("public profile page", () => {
   afterEach(() => {
     window.showPage?.("page-play");
     modal.remove();
-    leaderboard.remove();
     history.replaceState(null, "", "/");
   });
 
@@ -177,13 +154,13 @@ describe("public profile page", () => {
     });
 
     it("opens on the tab ?tab= names, and writes tab changes back to it", async () => {
-      await openFromPath("/player/aB3dE5fX?tab=clans");
+      await openFromPath("/player/aB3dE5fX?tab=games");
       await settle(() =>
-        expect(modal.textContent).toContain("player_profile.no_clans"),
+        expect(modal.querySelector("player-game-history-view")).not.toBeNull(),
       );
 
-      modal.setActiveTab("games");
-      expect(url()).toBe("/player/aB3dE5fX?tab=games");
+      modal.setActiveTab("stats");
+      expect(url()).toBe("/player/aB3dE5fX?tab=stats");
       expect(window.location.hash).toBe("");
     });
 
@@ -206,7 +183,7 @@ describe("public profile page", () => {
     it("hands the URL back to the hash once the profile is reopened in-app", async () => {
       await openFromPath("/player/aB3dE5fX");
       modal.close();
-      modal.openFromLeaderboard("other123");
+      modal.open({ publicID: "other123" });
       expect(url()).toBe("/#modal=profile&publicID=other123");
     });
 
@@ -220,8 +197,8 @@ describe("public profile page", () => {
       expect(url()).toBe("/#modal=profile&publicID=other123");
 
       // Tab changes land on the new player's URL, not the old path.
-      modal.setActiveTab("clans");
-      expect(url()).toBe("/#modal=profile&publicID=other123&tab=clans");
+      modal.setActiveTab("stats");
+      expect(url()).toBe("/#modal=profile&publicID=other123&tab=stats");
 
       // And the not-found panel doesn't name the old player's link.
       await settle(() =>
@@ -231,10 +208,10 @@ describe("public profile page", () => {
     });
 
     it("moves the hash on to another player's profile opened over this one", async () => {
-      modal.openFromLeaderboard("aB3dE5fX");
+      modal.open({ publicID: "aB3dE5fX" });
       expect(url()).toBe("/#modal=profile&publicID=aB3dE5fX");
-      modal.open({ publicID: "other123", tab: "clans" });
-      expect(url()).toBe("/#modal=profile&publicID=other123&tab=clans");
+      modal.open({ publicID: "other123", tab: "games" });
+      expect(url()).toBe("/#modal=profile&publicID=other123&tab=games");
     });
 
     it("leaves the URL alone when the same profile is reopened", async () => {
@@ -370,7 +347,7 @@ describe("public profile page", () => {
 
     it("leaves the link out when the profile wasn't opened from one", async () => {
       fetchPublicPlayerProfileMock.mockResolvedValue(false);
-      modal.openFromLeaderboard("missing1");
+      modal.open({ publicID: "missing1" });
       await settle(() =>
         expect(modal.querySelector("[data-not-found]")).not.toBeNull(),
       );
@@ -387,22 +364,6 @@ describe("public profile page", () => {
         modal.querySelector('[data-action="play"] button') as HTMLElement
       ).click();
       expect(modal.isOpen()).toBe(false);
-      expect(url()).toBe("/");
-    });
-
-    it("View leaderboard opens the leaderboard", async () => {
-      fetchPublicPlayerProfileMock.mockResolvedValue(false);
-      await openFromPath("/player/missing1");
-      await settle(() =>
-        expect(
-          modal.querySelector('[data-action="leaderboard"]'),
-        ).not.toBeNull(),
-      );
-      (
-        modal.querySelector('[data-action="leaderboard"] button') as HTMLElement
-      ).click();
-      expect(modal.isOpen()).toBe(false);
-      expect(leaderboardOpens).toBe(1);
       expect(url()).toBe("/");
     });
   });

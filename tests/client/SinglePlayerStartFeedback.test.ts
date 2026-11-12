@@ -178,7 +178,6 @@ describe("SinglePlayerModal start feedback", () => {
         source: "generated",
         verified: false,
       }),
-      getClanTag: () => null,
     };
     vi.spyOn(document, "querySelector").mockImplementation((selector) =>
       selector === "username-input" ? (seedStub as unknown as Element) : null,

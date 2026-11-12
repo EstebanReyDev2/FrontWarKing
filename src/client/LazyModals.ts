@@ -7,28 +7,20 @@ import { whenPageIdle } from "./WhenPageIdle";
  * load it before opening one, and prefetchModals loads them all in the
  * background once the page has loaded, so a click rarely waits on one.
  *
- * Modals that open each other (the account, clan, profile and game-stats
- * views) import each other, so a handoff between them never waits.
+ * Modals that open each other (the account, profile and game-stats views)
+ * import each other, so a handoff between them never waits.
  */
 const modules: Record<string, () => Promise<unknown>> = {
   "account-modal": () => import("./AccountModal"),
   "account-settings-modal": () => import("./AccountSettingsModal"),
   "change-username-modal": () => import("./ChangeUsernameModal"),
-  "clan-modal": () => import("./ClanModal"),
   "detailed-view-modal": () => import("./components/DetailedGameViewModal"),
   "game-stats-modal": () => import("./GameStatsModal"),
   "help-modal": () => import("./HelpModal"),
   "host-lobby-modal": () => import("./HostLobbyModal"),
-  "inventory-modal": () => import("./InventoryModal"),
   "join-lobby-modal": () => import("./JoinLobbyModal"),
-  "leaderboard-modal": () => import("./LeaderboardModal"),
-  "matchmaking-modal": () => import("./Matchmaking"),
   "player-profile-modal": () => import("./PlayerProfileModal"),
-  "ranked-modal": () => import("./components/RankedModal"),
-  "rewards-modal": () => import("./RewardsModal"),
   "single-player-modal": () => import("./SinglePlayerModal"),
-  "store-modal": () => import("./Store"),
-  "subscription-modal": () => import("./SubscriptionModal"),
   "token-login": () => import("./TokenLoginModal"),
   "troubleshooting-modal": () => import("./TroubleshootingModal"),
   "user-setting": () => import("./UserSettingModal"),

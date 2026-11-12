@@ -4,12 +4,6 @@
 # Tests that failed in just one run are in baseline-flaky.txt.
 # Format: <test file> > <full test name>
 
-tests/client/InventoryModal.test.ts > InventoryModal explains guest access across inventory categories and opens sign-in
-tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (a) shows the total, the level change and each source at its base value
-tests/client/PastGameXpCard.test.ts > <past-game-xp-card> (b) without a level-up, shows the level and the progress through it
-tests/client/ProfileCard.test.ts > <profile-card> shows the name, clan, prestige and level, the XP bar and lifetime XP
-tests/client/ProgressionModals.test.ts > player profile level shows another player's level from the public endpoint
-tests/client/RewardTrack.test.ts > <reward-track> end card tags the next rank's exclusive inside the card
 tests/DeployIdentity.test.ts > deploy.sh identity keeps a standalone prod deployment's page on its own name
 tests/DeployIdentity.test.ts > deploy.sh identity keeps the bare container name for any other explicit game host
 tests/DeployIdentity.test.ts > deploy.sh identity passes an explicit letter and worker count through
@@ -35,7 +29,7 @@ tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of green on 
 tests/DeployIdentity.test.ts > deploy.sh identity resolves the site of main on dev
 tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh defaults to a single worker when NUM_WORKERS is unset
 tests/GenerateNginxUpstream.test.ts > generate-nginx-upstream.sh generates the upstream + worker port map from NUM_WORKERS
-tests/UpdateFlagLatest.test.ts > update.sh flag_latest accepts a 404 immediately ÔÇö the API predates the registry
+tests/UpdateFlagLatest.test.ts > update.sh flag_latest accepts a 404 immediately — the API predates the registry
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (400)
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (401)
 tests/UpdateFlagLatest.test.ts > update.sh flag_latest does not retry a client error (403)
