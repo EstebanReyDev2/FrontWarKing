@@ -61,7 +61,9 @@ import { SpawnOverlayPass } from "./passes/SpawnOverlayPass";
 import { SpiralRibbonPass } from "./passes/SpiralRibbonPass";
 import { StructureLevelPass } from "./passes/StructureLevelPass";
 import { StructurePass } from "./passes/StructurePass";
-import { TerrainPass } from "./passes/TerrainPass";
+import { TerrainPass, type TerrainRenderer } from "./passes/TerrainPass";
+import { PixelTerrainPass } from "./passes/PixelTerrainPass";
+import { TerrainScatterPass } from "./passes/TerrainScatterPass";
 import { TerritoryPass } from "./passes/TerritoryPass";
 import { TrailPass } from "./passes/TrailPass";
 import { UnitPass } from "./passes/UnitPass";
@@ -120,7 +122,8 @@ export class GPURenderer {
   readonly glLimited: { renderer: string; maxTextureSize: number } | null;
 
   // Passes
-  private terrainPass: TerrainPass;
+  private terrainPass: TerrainRenderer;
+  private scatterPass: TerrainScatterPass | null = null;
   private territoryPass: TerritoryPass;
   private trailPass: TrailPass;
   private spiralRibbonPass: SpiralRibbonPass;
@@ -269,30 +272,19 @@ export class GPURenderer {
 
     this.camera = new Camera(mapW, mapH);
 
+    // The pixel style is chosen once, from ?pixel=; both terrain classes expose
+    // the same TerrainRenderer surface so nothing downstream branches on it.
+    const pixelStyle = parsePixelStyle();
+
     // --- Terrain (static) ---
-    // Bake once and let the array go — nothing below retains map-sized
-    // terrain bytes; re-bakes call terrainSource again.
+    // The raw bytes are needed once for the initial upload and, in pixel mode,
+    // for the deterministic decor placement. The baked path also keeps the
+    // provider so a settings change can re-bake from live bytes.
     const terrainBytes = terrainSource();
-    this.terrainPass = new TerrainPass(
-      gl,
-      terrainSource,
-      terrainBytes,
-      mapW,
-      mapH,
-      {
-        backgroundColor:
-          hexToRgb(this.settings.terrain.backgroundColor) ?? undefined,
-        oceanColor: hexToRgb(this.settings.terrain.oceanColor) ?? undefined,
-        sandColor: hexToRgb(this.settings.terrain.sandColor) ?? undefined,
-        plainsColor: hexToRgb(this.settings.terrain.plainsColor) ?? undefined,
-        highlandColor:
-          hexToRgb(this.settings.terrain.highlandColor) ?? undefined,
-        mountainColor:
-          hexToRgb(this.settings.terrain.mountainColor) ?? undefined,
-      },
-    );
 
     // --- Terrain bytes R8UI texture (shared by map-layer passes) ---
+    // Created before the terrain pass: the pixel path samples this texture
+    // directly, while the baked path keeps its own RGBA8 copy.
     this.terrainBytesTex = createTexture2D(gl, {
       width: mapW,
       height: mapH,
@@ -302,6 +294,45 @@ export class GPURenderer {
       data: terrainBytes,
       filter: gl.NEAREST,
     });
+    const terrainBytesTex = this.terrainBytesTex;
+
+    if (pixelStyle.includes("terrain")) {
+      this.terrainPass = new PixelTerrainPass(
+        gl,
+        terrainBytesTex,
+        mapW,
+        mapH,
+        this.settings,
+      );
+    } else {
+      this.terrainPass = new TerrainPass(
+        gl,
+        terrainSource,
+        terrainBytes,
+        mapW,
+        mapH,
+        {
+          backgroundColor:
+            hexToRgb(this.settings.terrain.backgroundColor) ?? undefined,
+          oceanColor: hexToRgb(this.settings.terrain.oceanColor) ?? undefined,
+          sandColor: hexToRgb(this.settings.terrain.sandColor) ?? undefined,
+          plainsColor: hexToRgb(this.settings.terrain.plainsColor) ?? undefined,
+          highlandColor:
+            hexToRgb(this.settings.terrain.highlandColor) ?? undefined,
+          mountainColor:
+            hexToRgb(this.settings.terrain.mountainColor) ?? undefined,
+        },
+      );
+    }
+
+    if (pixelStyle.includes("decor")) {
+      this.scatterPass = new TerrainScatterPass(
+        gl,
+        header,
+        terrainBytes,
+        terrainBytesTex,
+      );
+    }
 
     // --- Shared palette texture (RGBA32F, 4096×2) ---
     this.paletteData = paletteData;
@@ -570,9 +601,8 @@ export class GPURenderer {
     this.crosshairPass = new CrosshairPass(gl);
 
     // --- Remaining passes (unchanged from v1) ---
-    // The pixel style is chosen once, here, from ?pixel=; both classes expose
-    // the same API so nothing downstream branches on the style.
-    if (parsePixelStyle().includes("structures")) {
+    // Same `pixelStyle` resolved at the top of the constructor.
+    if (pixelStyle.includes("structures")) {
       this.pixelStructurePass = new PixelStructurePass(
         gl,
         header,
@@ -590,7 +620,7 @@ export class GPURenderer {
       );
     }
     this.structureLevelPass = new StructureLevelPass(gl, header, this.settings);
-    if (parsePixelStyle().includes("units")) {
+    if (pixelStyle.includes("units")) {
       this.pixelUnitPass = new PixelUnitPass(
         gl,
         header,
@@ -1332,14 +1362,14 @@ export class GPURenderer {
     if (compositingActive) {
       this.resizeSceneTargetIfNeeded(cw, ch);
       const sceneTex = toTarget(this.gl, this.sceneTarget, () =>
-        this.drawBaseLayer(cam),
+        this.drawBaseLayer(cam, zoom),
       );
       const lightTex = this.lightmapPass.draw(cam, cw, ch, this.frameTick);
       toScreen(this.gl, cw, ch, () =>
         this.nightCompositePass.draw(sceneTex, lightTex),
       );
     } else {
-      toScreen(this.gl, cw, ch, () => this.drawBaseLayer(cam));
+      toScreen(this.gl, cw, ch, () => this.drawBaseLayer(cam, zoom));
     }
 
     this.renderOverlays(cam, zoom);
@@ -1368,7 +1398,7 @@ export class GPURenderer {
     );
   }
 
-  private drawBaseLayer(cam: Float32Array): void {
+  private drawBaseLayer(cam: Float32Array, zoom: number): void {
     const gl = this.gl;
     const pe = this.settings.passEnabled;
     const [bgR, bgG, bgB] = hexToRgb(this.settings.terrain.backgroundColor) ?? [
@@ -1377,7 +1407,12 @@ export class GPURenderer {
     gl.clearColor(bgR / 255, bgG / 255, bgB / 255, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.BLEND);
-    if (pe.terrain) this.terrainPass.draw(cam);
+    if (pe.terrain) {
+      this.terrainPass.draw(cam, zoom);
+      // Decor is terrain detail: same gate, and it sits under the territory
+      // tint so player colours still read over it.
+      this.scatterPass?.draw(cam, zoom);
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     // Map layers sit between terrain and territory. Alt view hides the land
@@ -1521,6 +1556,7 @@ export class GPURenderer {
       this.gl.deleteTexture(this.terrainBytesTex);
       this.terrainBytesTex = null;
     }
+    this.scatterPass?.dispose();
     this.terrainPass.dispose();
     this.territoryPass.dispose();
     this.trailPass.dispose();

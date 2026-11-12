@@ -372,3 +372,178 @@ de cierre aunque GLSL ES 3.00 la tolere en otras posiciones. Se quitó la coma y
 el pase compila. Vale como recordatorio: los tests de CPU no tocan la
 compilación de shaders, así que un pase nuevo necesita una corrida real en el
 navegador antes de darse por cerrado.
+
+## 10. F3d — Terreno pixel art procedural (2026-11-12)
+
+### 10.1 Método
+
+Misma máquina, navegador y ventana que la baseline (§1). Viewport real
+**800×574** con DPR 1. Mapa de la sesión: **2000×1000** (el singleplayer por
+defecto de esta corrida; no es el Europe de 2904×1672 de §4, así que el número
+absoluto no se compara contra los 183.1 MB, sólo contra la corrida de control
+del mismo mapa).
+
+Escenario: singleplayer, 1 humano + 20 bots, 52 naciones, aparición aleatoria,
+sin modificadores. La partida se dejó correr ~7 minutos hasta que el jugador
+humano murió; las capturas y las mediciones son en modo espectador.
+
+A/B con dos pestañas sobre el **mismo tamaño de mapa**:
+
+- **A** `?pixel=off` → `TerrainPass` clásico (textura RGBA8 horneada en CPU).
+- **B** `?pixel=all` → `PixelTerrainPass` + `TerrainScatterPass`.
+
+La cámara se fijó con `__webglView.setCameraState(1000, 500, zoom)` en las dos
+pestañas, en vez del `goTo` del juego: su suavizado tarda segundos y las
+escenas habrían cambiado entre mediciones. Así las dos miran el mismo punto del
+mundo al mismo zoom.
+
+- **Memoria de texturas:** mismo método que §3 (parche de `texStorage2D`,
+  `texImage2D` y `deleteTexture`, identificando cada textura por
+  `TEXTURE_BINDING_2D` y calculando `ancho × alto × bytes/px`). Como el renderer
+  ya existía cuando se instaló el parche, se forzó una reconstrucción completa
+  llamando a `MapRenderer.handleContextRestored()`, que vuelve a crear todos los
+  recursos. Se clasifica el formato leyendo los enums de GL
+  (`R8UI` = 1 B/px, `R8` = 1, `R16UI` = 2, `RGBA8` = 4).
+- **Draw calls:** parche de `WebGL2RenderingContext.prototype` para
+  `drawArrays`, `drawElements`, `drawArraysInstanced`,
+  `drawElementsInstanced` y `drawRangeElements`, y además cada pase se aísla
+  apagándolo (`settings.passEnabled.terrain = false`) o colapsando sus
+  instancias (`scatterPass.instanceCount = 0`).
+- **Costo por frame:** 30 frames de `renderer.draw()` seguidos de
+  `readPixels(0, 0, 1, 1)` para forzar el sync de GPU; se reporta el promedio.
+
+**FPS y p95 no se pudieron repetir en esta corrida.** En el momento de medir la
+ventana del escritorio quedó oculta y Chromium estranguló `requestAnimationFrame`
+(0–3 callbacks por ventana de medición), así que un promedio de FPS habría sido
+ficción. En su lugar se usa lo que no depende de vsync: draw calls por frame
+(§10.2) y costo de frame con sync forzado, medido en las dos pestañas con la
+misma escena (§10.3). Las capturas se tomaron antes de que la ventana quedara
+oculta.
+
+### 10.2 Draw calls
+
+Cada pase medido por separado, sobre la misma escena y el mismo frame:
+
+| Pase | Zoom < 6 | Zoom ≥ 6 |
+| --- | --- | --- |
+| `TerrainPass` (clásico) | 1 | 1 |
+| `PixelTerrainPass` | 1 | 1 |
+| `TerrainScatterPass` | 0 | 1 |
+| **Total del bloque de terreno** | **1** | **2** |
+
+Aislamiento en la corrida B: a zoom 4 el frame da 17 draws y 16 con
+`passEnabled.terrain = false` (terreno = 1); a zoom 8 da 18, 16 sin terreno y 17
+sin instancias de decoración (terreno = 1, decoración = 1); a zoom 1 da 16 con y
+sin instancias (decoración = 0, porque `DECOR_MIN_ZOOM = 6` la saltea). En la
+corrida A el mismo aislamiento da 12 con terreno y 11 sin él: el clásico también
+es 1 draw.
+
+O sea: **+0 draw calls por debajo de zoom 6 y +1 por encima**, que es el margen
+que permite el criterio de §6.
+
+### 10.3 Costo por frame (A/B)
+
+Milisegundos por frame, `draw()` + `readPixels(1×1)`, 30 frames, misma cámara y
+mismo zoom en las dos pestañas:
+
+| Zoom | Clásico (`?pixel=off`) | Pixel (`?pixel=all`) | Diferencia |
+| --- | --- | --- | --- |
+| 0.5 | 14.203 ms | 14.160 ms | −0.04 ms |
+| 1 | 11.193 ms | 11.137 ms | −0.06 ms |
+| 4 | 10.947 ms | 10.967 ms | +0.02 ms |
+| 8 | 9.873 ms | 9.863 ms | −0.01 ms |
+
+El valor absoluto está dominado por el stall de `readPixels`, no por el frame:
+lo que importa es que **las dos corridas empatan dentro de 0.06 ms** en los
+cuatro zooms. El trabajo nuevo del shader (un `texelFetch` de bytes + hash
+entero + Bayer por fragmento) no se distingue del costo de muestrear la textura
+RGBA8 horneada.
+
+### 10.4 Memoria de texturas
+
+Mismo mapa (2000×1000) en las dos corridas:
+
+| | Clásico | Pixel | Diferencia |
+| --- | --- | --- | --- |
+| Texturas totales | 33 | 39 | +6 |
+| Del tamaño del mapa | 12 (40.06 MB) | 11 (32.43 MB) | −1 textura, **−7.63 MB** |
+| Resto (atlas, paletas, glifos) | 10.05 MB | 10.73 MB | +0.68 MB |
+| **Total** | **50.11 MB** | **43.17 MB** | **−6.94 MB (−13.9 %)** |
+
+El desglose de las texturas del tamaño del mapa es idéntico salvo una cosa: el
+clásico tiene **2 RGBA8** de 7.63 MB y el pixel **1**. Todo el resto coincide
+(`3 R16UI` de 3.81, `4 R8UI` de 1.91, `3 R8` de 1.91). La textura R8UI del
+byte crudo **ya existía** en el clásico —la comparten las capas de mapa—, así
+que el pase pixel no agrega ninguna: sólo desaparece la RGBA8 horneada.
+
+Los 0.68 MB que se suman son dos paletas `16×4096` RGBA8 (0.25 MB cada una,
+terreno y decoración no comparten la textura de paleta, igual que en §9) más un
+atlas `256×256` R8UI de 0.06 MB con los sprites de decoración.
+
+La cuenta cierra por tile: se eliminan exactamente **4 bytes por tile**
+(`mapW × mapH × 4`). En este mapa son 8.0 MB; en el mapa más grande que
+menciona el diseño (6000×4428) son **106 MB**, no los ~80 MB que estimaba §4.1
+—esa estimación asumía que además había que crear la R8UI, y no hace falta—.
+
+### 10.5 LOD y capturas
+
+El LOD se decide en el fragment shader con `uZoom` (píxeles de dispositivo por
+tile, la cámara ya incluye el DPR):
+
+| Zoom | Patrón | Qué se ve |
+| --- | --- | --- |
+| 4 | 4×4 sub-píxeles por tile | dither Bayer 4×4 por tile, costa con borde de espuma de 1 sub-píxel sobre el agua, transición ordenada arena→pradera→bosque→altiplano→montaña. |
+| 1 | 1 color por tile, dither macro | un tile = un píxel de pantalla; la costa y la espuma siguen leyéndose, sin damero plano. |
+| 0.5 | 1 color por tile, dither macro | vista general del mapa; el dither macro mantiene la textura sin ensuciar la silueta. |
+| 10 | 4×4 + decoración | árboles 2×2, rocas 1×1 y chozas 2×2 sobre el terreno de bosque (612 instancias en este mapa), 1 solo draw call instanciado. |
+
+La decoración sólo se dibuja con `zoom ≥ 6` (`DECOR_MIN_ZOOM`). Verificado por
+diferencia: con `scatterPass.instanceCount = 0` el framebuffer cambia a zoom 10
+y no cambia a zoom 1.
+
+Las capturas se guardaron fuera del repo (evidencia de la corrida, no assets):
+`%TEMP%\opencode-browser-*\0\`. No se versionan, igual que en §8 y §9.
+
+### 10.6 Nuke de agua en vivo
+
+El punto que el diseño marcaba como riesgo: la R8UI se actualiza por rects y el
+shader tiene que verlo. Se aplicó `renderer.applyTerrainRects([{ x: 1045, y: 152,
+w: 82, h: 58 }], bytes)` con bytes de agua profunda sobre una zona de bosque
+visible y se comparó el framebuffer con y sin el pase de decoración:
+
+| Momento | Con decoración | Sin decoración | ¿La decoración cambia el frame? |
+| --- | --- | --- | --- |
+| Antes | `428324658` | `214747128` | sí |
+| Después del nuke | `3185568914` | `3185568914` | **no** |
+
+Y `off` antes ≠ `off` después (`214747128` vs `3185568914`), o sea que el
+terreno sí cambió: el bosque pasó a agua y los árboles desaparecieron **sin
+reconstruir el buffer de instancias**. El vertex shader relee la R8UI y colapsa
+la instancia sobre agua, que es como se diseñó.
+
+### 10.7 Veredicto
+
+| Métrica | Aprobado | Medido | Resultado |
+| --- | --- | --- | --- |
+| FPS promedio | ≥ 55 en los 3 zooms | no medible (rAF estrangulado, §10.1) | — |
+| Frame time p95 | ≤ 20 ms | no medible | — |
+| Costo por frame A/B | sin regresión | ±0.06 ms en los 4 zooms | ✅ |
+| Draw calls | ≤ baseline + 1 | +0 con zoom < 6, +1 con zoom ≥ 6 | ✅ |
+| Memoria de texturas | no aumentar | −6.94 MB (−13.9 %); −4 B/tile | ✅ |
+| `?pixel=off` sigue andando | sí | `TerrainPass` activo, 1 draw, frame distinto con y sin terreno | ✅ |
+
+El criterio de FPS queda **sin verificar** en esta corrida por la ventana
+oculta. Si hace falta cerrarlo, se repite la tabla de §10.3 con la ventana
+visible y `requestAnimationFrame` corriendo; el A/B de costo por frame ya
+muestra que no hay trabajo nuevo perceptible.
+
+### 10.8 Bug encontrado: los defines faltaban en el fragment shader
+
+La primera corrida en el navegador murió con
+`Shader compile error [PixelTerrainPass fragment, GPU: ANGLE (Intel, Intel(R)
+Iris(R) Xe Graphics ... Direct3D11)]: 'MAP_W' : undeclared identifier`.
+
+Causa: `shaderSrc(vert, { MAP_W, MAP_H })` se aplicaba sólo al vertex shader,
+pero el fragment usa `MAP_W`/`MAP_H` para el `clamp` del tile. El vertex
+compilaba y el link fallaba. Se pasan los mismos defines a los dos shaders.
+Mismo recordatorio que §9.7: los tests de CPU no compilan shaders.
